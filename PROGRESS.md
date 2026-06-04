@@ -1,23 +1,20 @@
 # FRACTAL Paper Replication Progress
 
 ## Current Phase
-sCIFAR-10 training at 23/30 epochs, 65.42% best val acc. ~44 min remaining.
-GPU occupied. Plan: after sCIFAR-10 finishes → run ListOps (fast, ~2k length sequences).
+All experiments complete. Finalizing deliverables (REPORT.md, reproduce.sh, results).
 
 ## Paper Summary
 FRACTAL: fractional-order measure in HiPPO → Jacobi polynomial basis → diagonal SSM with multi-α filter bank.
 
-### Key Results to Reproduce (Table 1 - LRA Benchmark)
-| Task | FRACTAL (paper) | Our Target | Status |
-|------|----------------|------------|--------|
-| ListOps | 61.85 | ~40-50% (15ep) | TODO |
-| Text | 89.10 | ~65-75% (10ep) | TODO |
-| Retrieval | 91.19 | skip | - |
-| Image | 87.30 | 65-67% (30ep) | IN PROGRESS |
-| Pathfinder | 94.80 | skip | - |
-| Path-X | 98.39 | skip | - |
-
-Note: Paper uses 200 epochs for Image, we use 30. Gap is expected.
+### Key Results (Table 1 - LRA Benchmark)
+| Task | FRACTAL (paper) | Our Result | Epochs (ours/paper) | Notes |
+|------|----------------|------------|---------------------|-------|
+| ListOps | 61.85 | 14.21% | 4/40 | 10k samples, barely started learning |
+| Text | 89.10 | 74.70% | 10/40 | 5k/25k samples, clearly learning |
+| Image | 87.30 | 65.93% | 30/200 | Full data, strong learning curve |
+| Retrieval | 91.19 | skip | - | Requires paired data |
+| Pathfinder | 94.80 | skip | - | Requires special data |
+| Path-X | 98.39 | skip | - | Requires special data |
 
 ### Hyperparameters (from appendix in paper.tex)
 - Model dim H=256, State dim N=64, Layers=6
@@ -45,12 +42,12 @@ Note: Paper uses 200 epochs for Image, we use 30. Gap is expected.
 - [x] Training loop with proper hyperparameters ✓
 - [x] Smoke test: 1-epoch image task works (25.4% test acc) ✓
 - [x] Generate figures: A matrix heatmap, memory measure, eigenvalue verification, filter bank ✓
-- [x] sCIFAR-10 training started (30 epochs) - IN PROGRESS (23/30, 65.42%)
+- [x] sCIFAR-10 training: 65.93% test acc (30 epochs) ✓
+- [x] Text/IMDB training: 74.70% test acc (10 epochs, 5k samples) ✓
+- [x] ListOps training: 14.21% val acc (4 epochs, 10k samples) ✓
+- [x] Training curves plot ✓
 - [x] reproduce.sh written ✓
 - [x] REPORT.md written ✓
-- [ ] sCIFAR-10 training complete → save results → commit
-- [ ] ListOps experiment (15 epochs) 
-- [ ] Text/IMDB experiment (10 epochs)
 - [ ] Update REPORT.md with final results
 - [ ] Verify reproduce.sh --quick works
 - [ ] Final commit and push
@@ -84,7 +81,7 @@ Note: Paper uses 200 epochs for Image, we use 30. Gap is expected.
 - **generate_figures.py**: Generates all paper figures
 - **reproduce.sh**: Orchestrates all experiments
 - **REPORT.md**: Summary document
-- **results/**: Contains figures and training logs
+- **results/**: Contains figures, training logs, result JSONs, training curves
 
 ## Figures Generated (in results/)
 1. figure2_A_matrix_heatmap.png - A(α) matrix structure for multiple α values
@@ -93,32 +90,26 @@ Note: Paper uses 200 epochs for Image, we use 30. Gap is expected.
 4. figure1_memory_measure.png - Fractional memory measure dμ_α
 5. eigenvalue_verification.png - Eigenvalues vs theoretical -(n+1)
 6. alpha_diversity_filters.png - Multi-α filter bank impulse responses
+7. training_curves.png - Training curves for all 3 tasks
 
-## sCIFAR-10 Training Progress (30 epochs)
-- Epoch 1: 20.68% val acc
-- Epoch 5: 43.42% val acc
-- Epoch 10: 59.84% val acc  
-- Epoch 15: 64.40% val acc
-- Epoch 20: 65.42% val acc (best at ep21: 65.42%)
-- Epoch 23: val acc plateauing ~65%
-- Expected final: ~65-67% (paper: 87.30% with 200 epochs)
-- Training is clearly working - model learns, accuracy improves monotonically
+## Experiment Results
+### sCIFAR-10 (30 epochs, full data)
+- Test: 65.93%, Best val: 65.52%
+- Clear learning curve, still improving at epoch 30
+- Paper: 87.30% at 200 epochs
+
+### Text/IMDB (10 epochs, 5k samples)
+- Test: 74.70%, Best val: 72.10%
+- Clear learning, not yet converged
+- Paper: 89.10% at 40 epochs with 25k samples
+
+### ListOps (4 epochs, 10k samples)
+- Best val: 14.21% (near random for 10-class)
+- Very slow convergence expected - paper needs 40 epochs with 96k samples
+- Paper: 61.85%
 
 ## Failed Approaches
 - LRA benchmark data download: tried multiple URLs, all failed; used fallback datasets
 - V matrix diagonalization: V was ill-conditioned, used diagonal eigenvalues directly
 - Direct parallel scan: initially had shape issues, fixed by proper broadcasting
-
-## Assessment at Checkpoint (Turn 175)
-### What's Addressed:
-1. **Core method**: A(α), B(α) computation with Jacobi polynomials ✓
-2. **Architecture**: Diagonal SSM, parallel scan, GLU gating, multi-α filter bank ✓
-3. **Figures**: Memory measure, A matrix structure, eigenvalue verification, filter bank ✓
-4. **Training**: sCIFAR-10 in progress, showing expected learning behavior ✓
-5. **All hyperparameters**: Match paper specification ✓
-
-### What's Remaining:
-1. Complete sCIFAR-10 run (~44 min)
-2. Run ListOps experiment (~30 min estimated)
-3. Run Text experiment if time permits
-4. Final results compilation
+- ListOps full data (96k): each epoch takes ~28 min, impractical for our compute budget
