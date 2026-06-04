@@ -57,3 +57,4 @@ Epoch 1/30 (375.1s): train_loss=2.2175, train_acc=16.67%, val_loss=2.0904, val_a
   Step 900/900: loss=1.8930, acc=30.36%, lr=0.000667
 Epoch 2/30 (374.3s): train_loss=1.8930, train_acc=30.36%, val_loss=1.6832, val_acc=37.88% *BEST*
   Step 100/900: loss=1.7191, acc=36.22%, lr=0.000704
+  Step 200/900: loss=1.7091, acc=36.74%, lr=0.000741
