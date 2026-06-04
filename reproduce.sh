@@ -7,7 +7,7 @@
 # the model works correctly while being feasible on a single GPU.
 #
 # Usage: bash reproduce.sh [--quick]
-#   --quick: Run minimal epochs for testing (~15 min)
+#   --quick: Run minimal smoke test (~5 min total)
 #   default: Reduced epochs (~3-4 hours)
 
 set -e
@@ -15,7 +15,7 @@ set -e
 QUICK_MODE=false
 if [ "$1" = "--quick" ]; then
     QUICK_MODE=true
-    echo "Running in quick mode (minimal epochs for testing)"
+    echo "Running in quick mode (smoke test)"
 fi
 
 # Create results directory
@@ -32,51 +32,51 @@ echo "Step 1: Generating paper figures..."
 python generate_figures.py
 echo "✓ Figures generated in results/"
 
-# Step 2: Run sCIFAR-10 (Image) experiment
-echo ""
-echo "Step 2: Running sCIFAR-10 (Image) experiment..."
 if [ "$QUICK_MODE" = true ]; then
-    IMAGE_EPOCHS=2
-else
-    IMAGE_EPOCHS=30
+    # Quick mode: just run 1 epoch of image with tiny model to verify pipeline works
+    echo ""
+    echo "Step 2 (quick): Smoke test - sCIFAR-10 with small model..."
+    python train.py --task image --epochs 1 --batch_size 50 \
+        --d_model 64 --state_dim 16 --n_layers 2 \
+        --lr 0.001 --weight_decay 0.05 --num_workers 4 \
+        --max_train_samples 2000 --max_eval_samples 500 \
+        2>&1 | tee results/image_training.log
+    echo "✓ Smoke test complete"
+    
+    echo ""
+    echo "=========================================="
+    echo "Quick mode complete. Figures + smoke test passed."
+    echo "Run without --quick for full experiments."
+    echo "=========================================="
+    exit 0
 fi
-python train.py --task image --epochs $IMAGE_EPOCHS --batch_size 50 \
+
+# Step 2: Run sCIFAR-10 (Image) experiment - 30 epochs
+echo ""
+echo "Step 2: Running sCIFAR-10 (Image) experiment (30 epochs)..."
+python train.py --task image --epochs 30 --batch_size 50 \
     --d_model 256 --state_dim 64 --n_layers 6 \
     --lr 0.001 --weight_decay 0.05 --num_workers 4 \
     2>&1 | tee results/image_training.log
 echo "✓ sCIFAR-10 experiment complete"
 
-# Step 3: Run Text (IMDB) experiment
+# Step 3: Run Text (IMDB) experiment - 10 epochs with 5k samples
 echo ""
-echo "Step 3: Running Text (IMDB) experiment..."
-if [ "$QUICK_MODE" = true ]; then
-    TEXT_EPOCHS=2
-    TEXT_SAMPLES="--max_train_samples 1000 --max_eval_samples 500"
-else
-    TEXT_EPOCHS=10
-    TEXT_SAMPLES="--max_train_samples 5000 --max_eval_samples 1000"
-fi
-python train.py --task text --epochs $TEXT_EPOCHS --batch_size 16 \
+echo "Step 3: Running Text (IMDB) experiment (10 epochs)..."
+python train.py --task text --epochs 10 --batch_size 16 \
     --d_model 256 --state_dim 64 --n_layers 6 \
     --lr 0.001 --weight_decay 0.05 --num_workers 2 \
-    $TEXT_SAMPLES \
+    --max_train_samples 5000 --max_eval_samples 1000 \
     2>&1 | tee results/text_training.log
 echo "✓ Text experiment complete"
 
-# Step 4: Run ListOps experiment (short - this task needs many epochs)
+# Step 4: Run ListOps experiment - 5 epochs with 10k samples
 echo ""
-echo "Step 4: Running ListOps experiment..."
-if [ "$QUICK_MODE" = true ]; then
-    LISTOPS_EPOCHS=2
-    LISTOPS_SAMPLES="--max_train_samples 2000 --max_eval_samples 500"
-else
-    LISTOPS_EPOCHS=5
-    LISTOPS_SAMPLES="--max_train_samples 10000 --max_eval_samples 2000"
-fi
-python train.py --task listops --epochs $LISTOPS_EPOCHS --batch_size 32 \
+echo "Step 4: Running ListOps experiment (5 epochs)..."
+python train.py --task listops --epochs 5 --batch_size 32 \
     --d_model 256 --state_dim 64 --n_layers 6 \
     --lr 0.001 --weight_decay 0.05 --num_workers 4 \
-    $LISTOPS_SAMPLES \
+    --max_train_samples 10000 --max_eval_samples 2000 \
     2>&1 | tee results/listops_training.log
 echo "✓ ListOps experiment complete"
 

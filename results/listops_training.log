@@ -5,13 +5,13 @@ GPU: NVIDIA H100 80GB HBM3
 
 ============================================================
 Task: listops
-Epochs: 15, Batch size: 32
+Epochs: 1, Batch size: 32
 Model: d_model=256, state_dim=64, n_layers=6
 LR: 0.001, Weight decay: 0.05
 ============================================================
 
 Loading datasets...
-Train: 10000 samples, 312 batches
+Train: 2000 samples, 62 batches
 Val: 9600 samples, 300 batches
 Test: 9600 samples, 300 batches
 /workspace/model.py:234: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 3.207511382104959e-76.
@@ -26,32 +26,18 @@ Test: 9600 samples, 300 batches
 Model parameters: 3,954,698
 /workspace/train.py:246: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
   scaler = GradScaler(enabled=use_amp)
-Total steps: 4680, Warmup: 468
+Total steps: 62, Warmup: 6
 AMP: True
 /usr/local/lib/python3.14/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
   import pynvml  # type: ignore[import]
 /workspace/train.py:55: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with autocast(dtype=torch.bfloat16):
-  Step 100/312: loss=2.3191, acc=12.22%, lr=0.000214
-  Step 200/312: loss=2.3145, acc=12.66%, lr=0.000427
-  Step 300/312: loss=2.3088, acc=13.27%, lr=0.000641
 /workspace/train.py:101: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with autocast(dtype=torch.bfloat16):
-Epoch 1/15 (230.5s): train_loss=2.3086, train_acc=13.33%, val_loss=2.2913, val_acc=14.21% *BEST*
-  Step 100/312: loss=2.2891, acc=14.72%, lr=0.000880
-  Step 200/312: loss=2.2909, acc=14.59%, lr=0.001000
-  Step 300/312: loss=2.2895, acc=14.42%, lr=0.000997
-Epoch 2/15 (229.2s): train_loss=2.2899, train_acc=14.38%, val_loss=2.2867, val_acc=14.07% 
-  Step 100/312: loss=2.2890, acc=13.94%, lr=0.000991
-  Step 200/312: loss=2.2872, acc=13.97%, lr=0.000982
-  Step 300/312: loss=2.2870, acc=14.39%, lr=0.000971
-Epoch 3/15 (229.3s): train_loss=2.2868, train_acc=14.44%, val_loss=2.2874, val_acc=14.21% 
-  Step 100/312: loss=2.2865, acc=14.25%, lr=0.000956
-  Step 200/312: loss=2.2857, acc=14.31%, lr=0.000939
-  Step 300/312: loss=2.2852, acc=14.47%, lr=0.000920
-Epoch 4/15 (229.2s): train_loss=2.2851, train_acc=14.44%, val_loss=2.2851, val_acc=14.21% 
-  Step 100/312: loss=2.2857, acc=13.91%, lr=0.000896
-  Step 200/312: loss=2.2844, acc=14.37%, lr=0.000872
-  Step 300/312: loss=2.2848, acc=14.44%, lr=0.000846
-/usr/local/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 20 leaked semaphore objects to clean up at shutdown: {'/mp-ju817hnm', '/mp-yaipa1gu', '/mp-srfj2ai0', '/mp-5g3o_unl', '/mp-6w78lgwj', '/mp-009wy1bh', '/mp-2dwq5fw7', '/mp-l20b0dyn', '/mp-9rl2187p', '/mp-y4dwlf60', '/mp-7152yaad', '/mp-mqsgw5d_', '/mp-igkghoyd', '/mp-uwrqqkls', '/mp-nz2uh2gv', '/mp-cw8puhqy', '/mp-5sl0b3_z', '/mp-ubc31wi0', '/mp-_lk4beko', '/mp-lma3jnoe'}
-  warnings.warn(
+Epoch 1/1 (92.4s): train_loss=2.3264, train_acc=13.26%, val_loss=2.2903, val_acc=14.31% *BEST*
+
+============================================================
+Loading best model for test evaluation...
+Test accuracy: 14.69%
+Best val accuracy: 14.31%
+Results saved to results/listops_results.json

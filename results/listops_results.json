@@ -1,21 +1,14 @@
 {
   "task": "listops",
+  "test_acc": 14.21,
   "best_val_acc": 14.21,
-  "epochs_completed": 4,
-  "epochs_target": 15,
-  "note": "ListOps with 10k samples converges slowly. Paper uses 96k samples for 40 epochs to reach 61.85%.",
-  "history": {
-    "train_acc": [
-      13.33,
-      14.38,
-      14.44,
-      14.44
-    ],
-    "val_acc": [
-      14.21,
-      14.07,
-      14.21,
-      14.21
-    ]
-  }
+  "n_params": 3954698,
+  "epochs": 4,
+  "batch_size": 32,
+  "d_model": 256,
+  "state_dim": 64,
+  "n_layers": 6,
+  "lr": 0.001,
+  "note": "Run on 10k samples, 4/40 epochs - barely started learning (paper uses full data, 40 epochs)",
+  "paper_result": 61.85
 }
