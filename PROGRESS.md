@@ -1,8 +1,9 @@
 # FRACTAL Paper Replication Progress
 
 ## Current Phase
-Model implemented and tested. Now building LRA data loading and training loop.
-LRA dataset download from Google Cloud failed (403 Forbidden) — need alternative approach.
+Training infrastructure complete. Need to run experiments and generate visualizations.
+Key bottleneck: full training is too slow (~20h for sCIFAR-10 at 200 epochs).
+Strategy: Run reduced epochs, generate visualizations, demonstrate model works.
 
 ## Paper Summary
 FRACTAL: fractional-order measure in HiPPO → Jacobi polynomial basis → diagonal SSM with multi-α filter bank.
@@ -41,11 +42,14 @@ FRACTAL: fractional-order measure in HiPPO → Jacobi polynomial basis → diago
 - [x] Implement parallel scan (associative scan in PyTorch) ✓ (in model.py)
 - [x] Implement FRACTAL layer (GLU gating, pre-norm) ✓ (in model.py)
 - [x] Implement full FRACTAL model (stacked layers, encoder/decoder) ✓ (in model.py)
-- [ ] Implement LRA data loading (feasible tasks)
-- [ ] Training loop with proper hyperparameters
-- [ ] Run experiments on at least ListOps, Text, Image
-- [ ] Generate A matrix heatmap visualization (Figure 2)
-- [ ] Generate memory measure visualization (Figure 1)
+- [x] Implement LRA data loading (ListOps, IMDB, sCIFAR-10) ✓ (lra_datasets.py)
+- [x] Training loop with proper hyperparameters ✓ (train.py)
+- [x] Smoke test: 1-epoch image task works (25.4% test acc) ✓
+- [ ] Run sCIFAR-10 experiment (reduced epochs ~30-50)
+- [ ] Run ListOps experiment (reduced epochs ~15-20)
+- [ ] Run Text/IMDB experiment (reduced epochs ~10-15)
+- [ ] Generate A matrix heatmap visualization (Figure 2) — EASY, from init code
+- [ ] Generate memory measure visualization (Figure 1) — medium
 - [ ] Write reproduce.sh and REPORT.md
 
 ## Key Decisions
@@ -55,37 +59,42 @@ FRACTAL: fractional-order measure in HiPPO → Jacobi polynomial basis → diago
 - α config: K=8 blocks with [0,0,0.3,0.3,0.5,0.5,0.9,0.9]
 
 ## Completed Work
-- fractal_init.py: A(α) and B(α) computation, tested and working
+- **fractal_init.py**: A(α) and B(α) computation, tested and working
   - A(α=0) matches HiPPO-LegS exactly
   - Diagonal always n+1, lower triangular verified
   - B(α=0) = sqrt(2n+1) verified
-- model.py: Full FRACTAL model with:
+- **model.py**: Full FRACTAL model with:
   - DiagonalSSMLayer with ZOH discretization and parallel scan
   - FRACTALLayer with GLU gating, pre-norm, skip connections
   - FRACTALModel for classification (stacked layers + pooling + classifier)
-  - FRACTALModelLinear for linear recurrence mode
-  - Tested: forward pass works, shapes correct
+  - Tested: forward pass works, shapes correct, ~4M params (full config)
+- **lra_datasets.py**: Data loaders for ListOps (synthetic), IMDB (HuggingFace), sCIFAR-10
+- **train.py**: Training loop with AdamW, cosine schedule, warmup, AMP, gradient clipping
 
 ## Failed Approaches
-- Direct eigendecomposition for large N: V is ill-conditioned (cond ~10^11 for N=16)
-  - Won't use V^{-1}B directly for large N; will need alternative approach
+- Direct eigendecomposition for large N: V is ill-conditioned (cond ~10^76 for N=64)
+  - Fall back to normalized B for B̃ initialization
   - Paper says "asymptotic performance is comparable" with random init
-- LRA dataset download from https://storage.googleapis.com/long-range-arena/lra_release.gz
-  - Returns 403 Forbidden
-  - Need alternative: generate ListOps synthetically, IMDB from HF, CIFAR from torchvision
+- LRA dataset download from Google Cloud: 403 Forbidden
+  - Used alternatives: synthetic ListOps, HuggingFace IMDB, torchvision CIFAR-10
+- torch.compile on model: fails due to complex tensor view_as_real conjugate issue
+  - Not critical; model runs at acceptable speed without compilation
 
-## Data Loading Strategy (revised)
-For LRA tasks:
-1. **ListOps** (seq_len=2048): Generate synthetically - well defined task
-2. **Text/IMDB** (seq_len=4096): HuggingFace stanfordnlp/imdb, byte-level tokenization
-3. **Image/sCIFAR** (seq_len=1024): torchvision CIFAR-10, grayscale, flatten
-4. **Retrieval** (seq_len=4000): AAN dataset - may need to skip or simplify
-5. **Pathfinder** (seq_len=1024): Hard to generate - may skip
-6. **Path-X** (seq_len=16384): Hard to generate - may skip
+## Performance Estimates (full model: d=256, N=64, layers=6)
+- sCIFAR (bs=50, L=1024): ~0.4s/step, 900 steps/epoch, ~6min/epoch, ~20h for 200 epochs
+- ListOps (bs=32, L=2048): would be ~2x slower due to longer sequences
+- Text (bs=16, L=4096): would be ~4x slower due to 4096 length
 
-Priority: ListOps, Text, Image (3/6 tasks)
+## Plan for Remaining Work
+1. Run sCIFAR-10 for ~30 epochs (feasible in ~3h) — should show meaningful learning
+2. Run ListOps for ~10-15 epochs (feasible in ~2-3h)
+3. Generate Figure 2 (A matrix heatmap) — purely from fractal_init.py, no training needed
+4. Generate Figure 1 (memory measure) — requires impulse response computation
+5. Write reproduce.sh, REPORT.md
+6. Final cleanup and push
 
 ## Evaluation Coverage
-- Main result: LRA benchmark Table 1 (6 tasks) - IN PROGRESS
-- Numerical verification: A matrix heatmap (Figure 2) - NOT YET
-- Memory measure visualization (Figure 1) - NOT YET
+- Main result: LRA benchmark Table 1 (6 tasks) — will have 2-3 tasks with reduced epochs
+- Numerical verification: A matrix heatmap (Figure 2) — NOT YET, EASY to do
+- Memory measure visualization (Figure 1) — NOT YET
+- Ablation (Table 2): multi-α vs single α — could do quickly if time permits

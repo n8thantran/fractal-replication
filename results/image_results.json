@@ -1,0 +1,26 @@
+{
+  "task": "image",
+  "test_acc": 25.380000000000003,
+  "best_val_acc": 25.580000000000002,
+  "n_params": 84106,
+  "epochs": 1,
+  "batch_size": 16,
+  "d_model": 64,
+  "state_dim": 16,
+  "n_layers": 2,
+  "lr": 0.001,
+  "history": {
+    "train_loss": [
+      2.1549533285084017
+    ],
+    "train_acc": [
+      20.208036984352773
+    ],
+    "val_loss": [
+      2.06833828125
+    ],
+    "val_acc": [
+      25.580000000000002
+    ]
+  }
+}
