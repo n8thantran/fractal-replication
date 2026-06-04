@@ -1,12 +1,10 @@
 # FRACTAL Paper Replication Progress
 
 ## Current Phase
-Starting implementation. Paper has been fully read and understood.
+Building core model components. A(α) and B(α) computation works. Now building SSM layer and full model.
 
 ## Paper Summary
-FRACTAL introduces a fractional-order measure into the HiPPO framework for state space models.
-Key idea: use power-law measure μ(t)(x) = (1-α)/t^(1-α) * (t-x)^(-α) instead of uniform (LegS).
-This gives Jacobi polynomial basis with parameters (-α, 0).
+FRACTAL: fractional-order measure in HiPPO → Jacobi polynomial basis → diagonal SSM with multi-α filter bank.
 
 ### Key Results to Reproduce (Table 1 - LRA Benchmark)
 | Task | FRACTAL | S5 |
@@ -19,31 +17,26 @@ This gives Jacobi polynomial basis with parameters (-α, 0).
 | Path-X | 98.39 | 98.62 |
 | **Avg** | **87.11** | **87.04** |
 
-### Key Claims to Verify
-1. A(α) matrix: lower triangular, diagonal = n+1 (invariant to α), off-diagonal computed via Gauss-Jacobi quadrature
-2. B(α) vector: closed-form B_n = sqrt((2n+1-α)/(1-α)) * C(n-α, n)
-3. Fractional filter bank with multiple α channels improves performance
-4. A matrix heatmap visualization showing structure
-5. Memory measure visualization
-
-## Architecture Details (from paper)
-- Based on S5 architecture (diagonal SSM with parallel scan)
-- Model dim H=256, state dim N=64 per block
-- K channels with α linearly spaced in [0, 0.9]
-- LTI relaxation: drop 1/t factor, use learnable Δ
-- ZOH discretization: Ā = exp(-ΔA), B̄ = A^{-1}(Ā - I)B
-- Diagonalization: A = VΛV^{-1}, Λ_real = diag(1,2,...,N)
-- Complex augmentation: Λ = -Λ_real + iΛ_imag
-- B̃_init = V^{-1} * B(α)
-- GLU gating: z_out = (W_out * y) ⊙ σ(W_gate * z_in)
-- Parallel scan (associative scan) for training
+### Hyperparameters (from commented-out appendix in paper.tex)
+- Model dim H=256, State dim N=64, Layers=6
+- α config: [0,0,0.3,0.3,0.5,0.5,0.9,0.9] → K=8 channels
+- Batch sizes: ListOps=32, Text=16, Retrieval=32, Image=50, Pathfinder=32, PathX=16
+- LR=0.001 for all tasks, Weight decay=0.05
+- Epochs: ListOps=40, Text=40, Retrieval=30, Image=200, Pathfinder=200, PathX=200
+- Optimizer: AdamW (β1=0.9, β2=0.999)
+- LR schedule: linear warmup 10%, cosine decay
+- Gradient clip: global norm 1.0
+- Mixed precision: bfloat16 forward, float32 gradients
+- GLU gating with SiLU activation
 - Pre-norm (LayerNorm) before SSM
+- ZOH discretization
+- Complex diagonal: Λ = -Λ_real + iΛ_imag
 
 ## Implementation Plan
 - [x] Read paper thoroughly
-- [ ] Implement A(α) matrix computation (Gauss-Jacobi quadrature)
-- [ ] Implement B(α) vector computation (closed-form)
-- [ ] Implement eigendecomposition and B̃ initialization
+- [x] Implement A(α) matrix computation (Gauss-Jacobi quadrature) ✓
+- [x] Implement B(α) vector computation (closed-form) ✓
+- [ ] Handle ill-conditioned eigendecomposition for B̃ init
 - [ ] Implement diagonal SSM layer with ZOH discretization
 - [ ] Implement parallel scan (associative scan in PyTorch)
 - [ ] Implement FRACTAL layer (GLU gating, pre-norm)
@@ -51,23 +44,28 @@ This gives Jacobi polynomial basis with parameters (-α, 0).
 - [ ] Implement LRA data loading (all 6 tasks)
 - [ ] Training loop with proper hyperparameters
 - [ ] Run experiments on at least ListOps and Text tasks
-- [ ] Generate A matrix heatmap visualization
-- [ ] Generate memory measure visualization
+- [ ] Generate A matrix heatmap visualization (Figure 2)
+- [ ] Generate memory measure visualization (Figure 1)
 - [ ] Write reproduce.sh and REPORT.md
 
 ## Key Decisions
-- Using PyTorch (paper used JAX but we have PyTorch + CUDA available)
-- Will implement associative scan in PyTorch
-- For LRA datasets: use HuggingFace datasets or download directly
-- Hyperparams: follow S5 defaults where paper doesn't specify (lr, batch size, etc.)
+- Using PyTorch (paper used JAX)
+- For ill-conditioned V: just use the diagonal eigenvalues directly (1,2,...,N) as paper says
+- B̃_init may need normalization; paper notes random init converges to same final accuracy
+- α config: K=8 blocks with [0,0,0.3,0.3,0.5,0.5,0.9,0.9]
 
 ## Completed Work
-- Paper reading complete
+- fractal_init.py: A(α) and B(α) computation, tested and working
+  - A(α=0) matches HiPPO-LegS exactly
+  - Diagonal always n+1, lower triangular verified
+  - B(α=0) = sqrt(2n+1) verified
 
 ## Failed Approaches
-(none yet)
+- Direct eigendecomposition for large N: V is ill-conditioned (cond ~10^11 for N=16)
+  - Won't use V^{-1}B directly for large N; will need alternative approach
+  - Paper says "asymptotic performance is comparable" with random init
 
 ## Evaluation Coverage
-- Main result: LRA benchmark Table 1 (6 tasks)
-- Numerical verification: A matrix heatmap (Figure 2)
-- Memory measure visualization (Figure 1)
+- Main result: LRA benchmark Table 1 (6 tasks) - NOT YET
+- Numerical verification: A matrix heatmap (Figure 2) - NOT YET 
+- Memory measure visualization (Figure 1) - NOT YET
