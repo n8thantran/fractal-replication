@@ -268,3 +268,77 @@ Epoch 22/30 (373.6s): train_loss=0.4391, train_acc=86.02%, val_loss=1.0609, val_
 Epoch 23/30 (373.6s): train_loss=0.3948, train_acc=88.00%, val_loss=1.0811, val_acc=64.98% 
   Step 100/900: loss=0.3510, acc=90.52%, lr=0.000152
   Step 200/900: loss=0.3494, acc=90.46%, lr=0.000148
+  Step 300/900: loss=0.3513, acc=90.20%, lr=0.000143
+  Step 400/900: loss=0.3496, acc=90.18%, lr=0.000139
+  Step 500/900: loss=0.3499, acc=90.05%, lr=0.000134
+  Step 600/900: loss=0.3506, acc=90.00%, lr=0.000130
+  Step 700/900: loss=0.3528, acc=89.80%, lr=0.000125
+  Step 800/900: loss=0.3542, acc=89.73%, lr=0.000121
+  Step 900/900: loss=0.3548, acc=89.67%, lr=0.000117
+Epoch 24/30 (373.6s): train_loss=0.3548, train_acc=89.67%, val_loss=1.0812, val_acc=65.52% *BEST*
+  Step 100/900: loss=0.3197, acc=91.56%, lr=0.000113
+  Step 200/900: loss=0.3179, acc=91.44%, lr=0.000109
+  Step 300/900: loss=0.3184, acc=91.35%, lr=0.000105
+  Step 400/900: loss=0.3163, acc=91.44%, lr=0.000101
+  Step 500/900: loss=0.3172, acc=91.30%, lr=0.000097
+  Step 600/900: loss=0.3190, acc=91.21%, lr=0.000093
+  Step 700/900: loss=0.3179, acc=91.29%, lr=0.000089
+  Step 800/900: loss=0.3192, acc=91.26%, lr=0.000086
+  Step 900/900: loss=0.3209, acc=91.18%, lr=0.000082
+Epoch 25/30 (373.6s): train_loss=0.3209, train_acc=91.18%, val_loss=1.0925, val_acc=65.44% 
+  Step 100/900: loss=0.2921, acc=92.70%, lr=0.000079
+  Step 200/900: loss=0.2868, acc=92.81%, lr=0.000075
+  Step 300/900: loss=0.2883, acc=92.71%, lr=0.000072
+  Step 400/900: loss=0.2917, acc=92.52%, lr=0.000069
+  Step 500/900: loss=0.2907, acc=92.49%, lr=0.000065
+  Step 600/900: loss=0.2911, acc=92.47%, lr=0.000062
+  Step 700/900: loss=0.2928, acc=92.38%, lr=0.000059
+  Step 800/900: loss=0.2933, acc=92.36%, lr=0.000056
+  Step 900/900: loss=0.2934, acc=92.36%, lr=0.000053
+Epoch 26/30 (373.6s): train_loss=0.2934, train_acc=92.36%, val_loss=1.1026, val_acc=65.42% 
+  Step 100/900: loss=0.2711, acc=93.30%, lr=0.000050
+  Step 200/900: loss=0.2623, acc=93.70%, lr=0.000048
+  Step 300/900: loss=0.2657, acc=93.35%, lr=0.000045
+  Step 400/900: loss=0.2673, acc=93.44%, lr=0.000042
+  Step 500/900: loss=0.2702, acc=93.33%, lr=0.000040
+  Step 600/900: loss=0.2693, acc=93.41%, lr=0.000037
+  Step 700/900: loss=0.2704, acc=93.35%, lr=0.000035
+  Step 800/900: loss=0.2710, acc=93.34%, lr=0.000032
+  Step 900/900: loss=0.2721, acc=93.28%, lr=0.000030
+Epoch 27/30 (373.6s): train_loss=0.2721, train_acc=93.28%, val_loss=1.1076, val_acc=65.38% 
+  Step 100/900: loss=0.2431, acc=94.30%, lr=0.000028
+  Step 200/900: loss=0.2508, acc=94.25%, lr=0.000026
+  Step 300/900: loss=0.2528, acc=94.29%, lr=0.000024
+  Step 400/900: loss=0.2542, acc=94.16%, lr=0.000022
+  Step 500/900: loss=0.2558, acc=94.01%, lr=0.000020
+  Step 600/900: loss=0.2568, acc=93.94%, lr=0.000018
+  Step 700/900: loss=0.2573, acc=93.87%, lr=0.000017
+  Step 800/900: loss=0.2578, acc=93.85%, lr=0.000015
+  Step 900/900: loss=0.2575, acc=93.85%, lr=0.000013
+Epoch 28/30 (373.6s): train_loss=0.2575, train_acc=93.85%, val_loss=1.1144, val_acc=65.38% 
+  Step 100/900: loss=0.2537, acc=93.96%, lr=0.000012
+  Step 200/900: loss=0.2470, acc=94.54%, lr=0.000011
+  Step 300/900: loss=0.2501, acc=94.35%, lr=0.000009
+  Step 400/900: loss=0.2479, acc=94.45%, lr=0.000008
+  Step 500/900: loss=0.2477, acc=94.44%, lr=0.000007
+  Step 600/900: loss=0.2486, acc=94.37%, lr=0.000006
+  Step 700/900: loss=0.2485, acc=94.35%, lr=0.000005
+  Step 800/900: loss=0.2485, acc=94.35%, lr=0.000004
+  Step 900/900: loss=0.2482, acc=94.34%, lr=0.000003
+Epoch 29/30 (373.7s): train_loss=0.2482, train_acc=94.34%, val_loss=1.1150, val_acc=65.46% 
+  Step 100/900: loss=0.2551, acc=93.96%, lr=0.000003
+  Step 200/900: loss=0.2468, acc=94.29%, lr=0.000002
+  Step 300/900: loss=0.2467, acc=94.32%, lr=0.000002
+  Step 400/900: loss=0.2450, acc=94.39%, lr=0.000001
+  Step 500/900: loss=0.2457, acc=94.39%, lr=0.000001
+  Step 600/900: loss=0.2447, acc=94.42%, lr=0.000000
+  Step 700/900: loss=0.2443, acc=94.45%, lr=0.000000
+  Step 800/900: loss=0.2433, acc=94.51%, lr=0.000000
+  Step 900/900: loss=0.2436, acc=94.50%, lr=0.000000
+Epoch 30/30 (373.6s): train_loss=0.2436, train_acc=94.50%, val_loss=1.1155, val_acc=65.32% 
+
+============================================================
+Loading best model for test evaluation...
+Test accuracy: 65.93%
+Best val accuracy: 65.52%
+Results saved to results/image_results.json
