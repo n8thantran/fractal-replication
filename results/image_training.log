@@ -37,7 +37,7 @@ AMP: True
   Step 900/900: loss=2.1938, acc=18.14%, lr=0.000000
 /workspace/train.py:101: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with autocast(dtype=torch.bfloat16):
-Epoch 1/1 (37.4s): train_loss=2.1938, train_acc=18.14%, val_loss=2.1185, val_acc=21.88% *BEST*
+Epoch 1/1 (37.3s): train_loss=2.1938, train_acc=18.14%, val_loss=2.1185, val_acc=21.88% *BEST*
 
 ============================================================
 Loading best model for test evaluation...
