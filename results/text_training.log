@@ -1,0 +1,83 @@
+/usr/local/lib/python3.14/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Using device: cuda
+GPU: NVIDIA H100 80GB HBM3
+
+============================================================
+Task: text
+Epochs: 10, Batch size: 16
+Model: d_model=256, state_dim=64, n_layers=6
+LR: 0.001, Weight decay: 0.05
+============================================================
+
+Loading datasets...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Train: 5000 samples, 312 batches
+Val: 1000 samples, 63 batches
+Test: 1000 samples, 63 batches
+/workspace/model.py:234: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 3.207511382104959e-76.
+  V_inv = linalg.inv(V)
+/workspace/model.py:234: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 5.409008756801859e-77.
+  V_inv = linalg.inv(V)
+/workspace/model.py:234: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 2.8330416133997232e-77.
+  V_inv = linalg.inv(V)
+/workspace/model.py:234: LinAlgWarning: An ill-conditioned matrix detected: slice 0 has rcond = 2.283863910597509e-78.
+  V_inv = linalg.inv(V)
+
+Model parameters: 4,014,338
+/workspace/train.py:246: FutureWarning: `torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+  scaler = GradScaler(enabled=use_amp)
+Total steps: 3120, Warmup: 312
+AMP: True
+/usr/local/lib/python3.14/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/workspace/train.py:55: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(dtype=torch.bfloat16):
+  Step 100/312: loss=0.7088, acc=49.56%, lr=0.000321
+  Step 200/312: loss=0.7009, acc=51.31%, lr=0.000641
+  Step 300/312: loss=0.6964, acc=52.25%, lr=0.000962
+/workspace/train.py:101: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  with autocast(dtype=torch.bfloat16):
+Epoch 1/10 (48.5s): train_loss=0.6967, train_acc=52.20%, val_loss=0.6813, val_acc=53.60% *BEST*
+  Step 100/312: loss=0.6809, acc=55.94%, lr=0.000997
+  Step 200/312: loss=0.6762, acc=57.69%, lr=0.000988
+  Step 300/312: loss=0.6746, acc=57.83%, lr=0.000972
+Epoch 2/10 (47.3s): train_loss=0.6738, train_acc=58.05%, val_loss=0.6615, val_acc=61.80% *BEST*
+  Step 100/312: loss=0.6658, acc=60.50%, lr=0.000948
+  Step 200/312: loss=0.6596, acc=60.69%, lr=0.000920
+  Step 300/312: loss=0.6600, acc=60.48%, lr=0.000887
+Epoch 3/10 (47.3s): train_loss=0.6608, train_acc=60.28%, val_loss=0.6505, val_acc=62.50% *BEST*
+  Step 100/312: loss=0.6615, acc=60.19%, lr=0.000845
+  Step 200/312: loss=0.6568, acc=60.84%, lr=0.000802
+  Step 300/312: loss=0.6543, acc=60.77%, lr=0.000756
+Epoch 4/10 (47.3s): train_loss=0.6529, train_acc=61.10%, val_loss=0.6410, val_acc=64.20% *BEST*
+  Step 100/312: loss=0.6383, acc=62.81%, lr=0.000700
+  Step 200/312: loss=0.6429, acc=62.16%, lr=0.000648
+  Step 300/312: loss=0.6391, acc=63.02%, lr=0.000593
+Epoch 5/10 (47.3s): train_loss=0.6387, train_acc=63.14%, val_loss=0.6271, val_acc=65.30% *BEST*
+  Step 100/312: loss=0.6226, acc=65.69%, lr=0.000531
+  Step 200/312: loss=0.6322, acc=64.25%, lr=0.000475
+  Step 300/312: loss=0.6259, acc=65.42%, lr=0.000420
+Epoch 6/10 (47.3s): train_loss=0.6268, train_acc=65.24%, val_loss=0.6381, val_acc=65.20% 
+  Step 100/312: loss=0.6270, acc=64.06%, lr=0.000359
+  Step 200/312: loss=0.6135, acc=65.97%, lr=0.000306
+  Step 300/312: loss=0.6089, acc=66.23%, lr=0.000256
+Epoch 7/10 (47.3s): train_loss=0.6071, train_acc=66.49%, val_loss=0.6039, val_acc=68.80% *BEST*
+  Step 100/312: loss=0.5817, acc=70.19%, lr=0.000203
+  Step 200/312: loss=0.5819, acc=69.84%, lr=0.000160
+  Step 300/312: loss=0.5755, acc=70.15%, lr=0.000121
+Epoch 8/10 (47.3s): train_loss=0.5737, train_acc=70.33%, val_loss=0.5810, val_acc=68.90% *BEST*
+  Step 100/312: loss=0.5565, acc=71.50%, lr=0.000083
+  Step 200/312: loss=0.5397, acc=72.69%, lr=0.000055
+  Step 300/312: loss=0.5319, acc=73.56%, lr=0.000032
+Epoch 9/10 (47.3s): train_loss=0.5302, train_acc=73.78%, val_loss=0.5609, val_acc=72.10% *BEST*
+  Step 100/312: loss=0.5121, acc=75.56%, lr=0.000014
+  Step 200/312: loss=0.5049, acc=75.56%, lr=0.000004
+  Step 300/312: loss=0.4995, acc=75.50%, lr=0.000000
+Epoch 10/10 (47.3s): train_loss=0.4986, train_acc=75.58%, val_loss=0.5545, val_acc=71.20% 
+
+============================================================
+Loading best model for test evaluation...
+Test accuracy: 74.70%
+Best val accuracy: 72.10%
+Results saved to results/text_results.json
