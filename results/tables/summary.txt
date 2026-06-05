@@ -20,11 +20,12 @@ k-means:
   MDS (k-1): mean ARI = 0.227 (-0.003)
   MDS (25%): mean ARI = 0.221 (-0.009)
   MDS (50%): mean ARI = 0.231 (+0.001)
+  >>> Best DR: Kernel PCA (k-1) (mean ARI = 0.256)
 
   Synthetic data:
-    Circles: NR=0.119, best DR: Isomap_50%=0.136
-    Moons: NR=0.468, best DR: Kernel PCA_k-1=0.555
-    RSG: NR=0.977, best DR: Isomap_k-1=0.999
+    Circles: NR=0.119, best: Isomap_50%=0.136
+    Moons: NR=0.468, best: Kernel PCA_k-1=0.555
+    RSG: NR=0.977, best: Isomap_k-1=0.999
     Repliclust: NR=1.000
 
 AHC:
@@ -45,11 +46,12 @@ AHC:
   MDS (k-1): mean ARI = 0.255 (-0.037)
   MDS (25%): mean ARI = 0.248 (-0.044)
   MDS (50%): mean ARI = 0.259 (-0.032)
+  >>> No DR method improves over baseline
 
   Synthetic data:
-    Circles: NR=0.093, best DR: Isomap_25%=0.139
-    Moons: NR=0.516, best DR: Isomap_k-1=0.669
-    RSG: NR=0.992, best DR: Isomap_k-1=0.997
+    Circles: NR=0.093, best: Isomap_25%=0.139
+    Moons: NR=0.516, best: Isomap_k-1=0.669
+    RSG: NR=0.992, best: Isomap_k-1=0.997
     Repliclust: NR=1.000
 
 GMM:
@@ -70,12 +72,13 @@ GMM:
   MDS (k-1): mean ARI = 0.228 (-0.064)
   MDS (25%): mean ARI = 0.203 (-0.089)
   MDS (50%): mean ARI = 0.221 (-0.071)
+  >>> No DR method improves over baseline
 
   Synthetic data:
-    Circles: NR=0.103, best DR: Isomap_k-1=0.121
-    Moons: NR=0.513, best DR: Isomap_k-1=0.647
-    RSG: NR=0.970, best DR: Kernel PCA_k-1=0.980
-    Repliclust: NR=0.935, best DR: Kernel PCA_k-1=1.000
+    Circles: NR=0.103, best: Isomap_k-1=0.121
+    Moons: NR=0.513, best: Isomap_k-1=0.647
+    RSG: NR=0.970, best: Kernel PCA_k-1=0.980
+    Repliclust: NR=0.935, best: Kernel PCA_k-1=1.000
 
 OPTICS:
 ------------------------------------------------------------
@@ -95,9 +98,10 @@ OPTICS:
   MDS (k-1): mean ARI = 0.093 (-0.055)
   MDS (25%): mean ARI = 0.086 (-0.063)
   MDS (50%): mean ARI = 0.120 (-0.029)
+  >>> No DR method improves over baseline
 
   Synthetic data:
-    Circles: NR=0.022, best DR: PCA_k-1=0.282
-    Moons: NR=0.112, best DR: MDS_k-1=0.264
+    Circles: NR=0.022, best: PCA_k-1=0.282
+    Moons: NR=0.112, best: MDS_k-1=0.264
     RSG: NR=0.856
     Repliclust: NR=1.000

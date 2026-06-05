@@ -1,0 +1,26 @@
+Comparison of our k-means (No Reduction) ARI with paper values
+============================================================
+Dataset                  Paper    Ours    Diff
+------------------------------------------------------------
+Breast_Wisconsin          0.77    0.67   -0.10
+Breast_tissue             0.34    0.26   -0.08
+Ecoli                     0.65    0.50   -0.15
+Glass                     0.18    0.18   +0.00
+Haberman                  0.10   -0.00   -0.10
+Ionosphere                0.18    0.17   -0.01
+Iris                      0.57    0.62   +0.05
+Movement_libras           0.34    0.31   -0.03
+Musk                      0.01    0.00   -0.01
+Parkinsons                0.12   -0.10   -0.22
+Segmentation              0.43    0.46   +0.03
+Sonar_all                 0.00   -0.00   -0.00
+Spectf                   -0.10   -0.10   +0.00
+Transfusion               0.03    0.05   +0.02
+Vehicle                   0.11    0.08   -0.03
+Vertebral_column          0.11    0.21   +0.10
+Vowel_context             0.11    0.16   +0.05
+Wine                      0.91    0.90   -0.01
+Wine_quality_red          0.08    0.06   -0.02
+Yeast                     0.19    0.17   -0.02
+------------------------------------------------------------
+Mean absolute difference: 0.052

@@ -1,8 +1,8 @@
 """
 Generate all tables and figures for the paper replication.
-Tables A.1-A.4: Synthetic data results
-Tables A.5-A.8: Real-world data results  
-Tables 2-5: Aggregate statistics
+Tables A.1-A.4: Synthetic data results (average ARI per data type)
+Tables A.5-A.8: Real-world data results (ARI per dataset per clustering)
+Tables 2-5: Aggregate statistics (win%, avg change)
 Table A.9: Wilcoxon signed-rank test
 Figures: Boxplots for synthetic and real data
 """
@@ -47,6 +47,7 @@ def load_data():
                 real[ds] = {}
             real[ds][cn] = raw_real[cn][ds]
     
+    # Load averaged synthetic
     with open(os.path.join(RESULTS_DIR, 'synthetic_results_v3.json')) as f:
         synth = json.load(f)
     
@@ -167,11 +168,8 @@ def generate_real_tables(real):
 def compute_aggregate(real, synth, synth_raw, cn):
     """
     Compute aggregate statistics for a clustering algorithm.
-    For each DR method + level:
-    - Win% Synthetic: % of synthetic repeats where DR improves over No Reduction
-    - Win% Real: % of real datasets where DR improves over No Reduction
-    - Avg% Synthetic: average % change in ARI vs No Reduction (synthetic)
-    - Avg% Real: average % change in ARI vs No Reduction (real)
+    Win%: fraction of datasets/repeats where DR > No Reduction
+    Avg%: average relative change in ARI vs No Reduction
     """
     results = []
     datasets = sorted(real.keys())
@@ -180,7 +178,7 @@ def compute_aggregate(real, synth, synth_raw, cn):
         for lv in LEVELS:
             key = f'{dr}_{lv}'
             
-            # Synthetic: use raw per-repeat data if available
+            # Synthetic: use raw per-repeat data
             syn_wins = 0
             syn_total = 0
             syn_changes = []
@@ -189,31 +187,18 @@ def compute_aggregate(real, synth, synth_raw, cn):
                 for dtype in SYNTH_TYPES:
                     if dtype in synth_raw:
                         for repeat_data in synth_raw[dtype]:
-                            if cn in repeat_data:
-                                nr = repeat_data[cn].get('No Reduction')
-                                dr_val = repeat_data[cn].get(key)
+                            rd = repeat_data.get('results', repeat_data)
+                            if cn in rd:
+                                nr = rd[cn].get('No Reduction')
+                                dr_val = rd[cn].get(key)
                                 if nr is not None and dr_val is not None:
                                     syn_total += 1
-                                    if dr_val > nr + 0.001:
+                                    if dr_val > nr + 1e-6:
                                         syn_wins += 1
                                     if abs(nr) > 0.001:
                                         syn_changes.append((dr_val - nr) / abs(nr) * 100)
                                     else:
                                         syn_changes.append((dr_val - nr) * 100)
-            else:
-                # Fallback: use averaged synthetic data
-                for dtype in SYNTH_TYPES:
-                    if dtype in synth and cn in synth[dtype]:
-                        nr = synth[dtype][cn].get('No Reduction')
-                        dr_val = synth[dtype][cn].get(key)
-                        if nr is not None and dr_val is not None:
-                            syn_total += 1
-                            if dr_val > nr + 0.001:
-                                syn_wins += 1
-                            if abs(nr) > 0.001:
-                                syn_changes.append((dr_val - nr) / abs(nr) * 100)
-                            else:
-                                syn_changes.append((dr_val - nr) * 100)
             
             # Real wins and avg change
             real_wins = 0
@@ -226,7 +211,7 @@ def compute_aggregate(real, synth, synth_raw, cn):
                     dr_val = real[ds][cn].get(key)
                     if nr is not None and dr_val is not None:
                         real_total += 1
-                        if dr_val > nr + 0.001:
+                        if dr_val > nr + 1e-6:
                             real_wins += 1
                         if abs(nr) > 0.001:
                             real_changes.append((dr_val - nr) / abs(nr) * 100)
@@ -268,17 +253,19 @@ def generate_aggregate_tables(real, synth, synth_raw):
             w.writerow(['Method', 'Reduction', 'Win% Syn', 'Win% Real', 'Avg% Syn', 'Avg% Real'])
             for r in agg:
                 w.writerow([r['method'], r['level'], 
-                           f"{r['win_syn']:.2f}", f"{r['win_real']:.2f}",
+                           f"{r['win_syn']:.1f}", f"{r['win_real']:.1f}",
                            f"{r['avg_syn']:.2f}", f"{r['avg_real']:.2f}"])
         
         # TXT
         with open(os.path.join(TABLES_DIR, fname + '.txt'), 'w') as f:
             f.write(f'Table {tnum}: Aggregate statistics for {cn}\n')
-            f.write('=' * 78 + '\n')
+            f.write(f'Win% = percentage of datasets where DR improves over No Reduction\n')
+            f.write(f'Avg% = average relative ARI change vs No Reduction\n')
+            f.write('=' * 80 + '\n')
             f.write(f'{"Method":<16}{"Reduction":<12}{"Win% Syn":>10}{"Win% Real":>12}{"Avg% Syn":>14}{"Avg% Real":>14}\n')
-            f.write('-' * 78 + '\n')
+            f.write('-' * 80 + '\n')
             for r in agg:
-                f.write(f'{r["method"]:<16}{r["level"]:<12}{r["win_syn"]:>10.2f}{r["win_real"]:>12.2f}'
+                f.write(f'{r["method"]:<16}{r["level"]:<12}{r["win_syn"]:>10.1f}{r["win_real"]:>12.1f}'
                        f'{r["avg_syn"]:>14.2f}{r["avg_real"]:>14.2f}\n')
         
         print(f'  Generated {fname}')
@@ -286,13 +273,11 @@ def generate_aggregate_tables(real, synth, synth_raw):
 
 def generate_wilcoxon(real):
     """Table A.9: Wilcoxon signed-rank test (one-sided).
-    Format matches paper: rows = clustering algorithms, 
-    columns = DR methods × levels
     H1: ARI_method > ARI_baseline, alpha=0.05, n=20
+    Rows = clustering algorithms, Cols = DR methods × levels
     """
     datasets = sorted(real.keys())
     
-    # Build the table: rows = clustering, cols = DR × levels
     dr_level_cols = []
     for dr in DR_METHODS:
         for lv in LEVELS:
@@ -316,20 +301,16 @@ def generate_wilcoxon(real):
             
             if len(nr_vals) >= 5:
                 diffs = np.array(dr_vals) - np.array(nr_vals)
-                # One-sided Wilcoxon: H1 = DR > baseline
                 try:
                     stat, pval = stats.wilcoxon(diffs, alternative='greater')
-                except:
+                except Exception:
                     try:
-                        # Fallback for older scipy
                         stat, pval_two = stats.wilcoxon(diffs)
-                        # For one-sided, halve the two-sided p-value
-                        # But need to check direction
                         if np.sum(diffs > 0) > np.sum(diffs < 0):
                             pval = pval_two / 2
                         else:
                             pval = 1 - pval_two / 2
-                    except:
+                    except Exception:
                         pval = 1.0
             else:
                 pval = 1.0
@@ -339,15 +320,11 @@ def generate_wilcoxon(real):
     # CSV
     with open(os.path.join(TABLES_DIR, 'table_A9_wilcoxon.csv'), 'w', newline='') as f:
         w = csv.writer(f)
-        # Header with DR/level grouping
-        header1 = ['']
-        header2 = ['Algorithm']
+        header = ['Algorithm']
         for dr in DR_METHODS:
             for lv in LEVELS:
-                header1.append(dr)
-                header2.append(lv)
-        w.writerow(header1)
-        w.writerow(header2)
+                header.append(f'{dr}_{lv}')
+        w.writerow(header)
         
         for cn in CLUSTERING:
             row = [cn]
@@ -361,9 +338,8 @@ def generate_wilcoxon(real):
         f.write('Table A.9: Wilcoxon signed-rank test results on 20 real-world benchmarks\n')
         f.write('One-sided test: H1: ARI_method > ARI_baseline, alpha = 0.05, n = 20\n')
         f.write('Significant p-values (< 0.05) are marked with *\n')
-        f.write('=' * 120 + '\n')
+        f.write('=' * 130 + '\n')
         
-        # Column headers
         line1 = f'{"":>14}'
         for dr in DR_METHODS:
             span = len(LEVELS) * 8
@@ -375,7 +351,7 @@ def generate_wilcoxon(real):
             for lv in LEVELS:
                 line2 += f'{lv:>8}'
         f.write(line2 + '\n')
-        f.write('-' * 120 + '\n')
+        f.write('-' * 130 + '\n')
         
         for cn in CLUSTERING:
             line = f'{cn:>14}'
@@ -385,11 +361,10 @@ def generate_wilcoxon(real):
                 line += f'{pval:>7.3f}{marker}'
             f.write(line + '\n')
         
-        f.write('-' * 120 + '\n')
+        f.write('-' * 130 + '\n')
     
     print(f'  Generated table_A9_wilcoxon')
     
-    # Count significant results
     sig_count = 0
     total = 0
     for cn in results_matrix:
@@ -400,13 +375,80 @@ def generate_wilcoxon(real):
     print(f'  {sig_count}/{total} tests significant at p<0.05')
 
 
+def generate_synthetic_boxplots(synth_raw):
+    """Figures 2-5: Boxplots per clustering algorithm on synthetic data.
+    Each figure has subplots for each data type, showing all DR methods."""
+    if not synth_raw:
+        print('  No raw synthetic data available for boxplots')
+        return
+    
+    for cn in CLUSTERING:
+        safe_cn = cn.replace('-', '_')
+        fig, axes = plt.subplots(1, 4, figsize=(24, 6), sharey=True)
+        fig.suptitle(f'ARI Distribution for {cn} on Synthetic Data', fontsize=14, fontweight='bold')
+        
+        for di, dtype in enumerate(SYNTH_TYPES):
+            ax = axes[di]
+            
+            # Collect data for each method (No DR + 5 DR methods × 3 levels = 16 conditions)
+            # But paper shows: No Reduction, then each DR method at each level
+            # Let's show: No DR, PCA, KPCA, VAE, Isomap, MDS (each aggregated across levels)
+            # Actually paper shows per-level boxplots. Let me show per-method across all levels
+            
+            labels = ['No DR']
+            data_to_plot = []
+            
+            # No Reduction
+            vals = []
+            if dtype in synth_raw:
+                for r in synth_raw[dtype]:
+                    rd = r.get('results', r)
+                    if cn in rd:
+                        v = rd[cn].get('No Reduction')
+                        if v is not None:
+                            vals.append(v)
+            data_to_plot.append(vals if vals else [0])
+            
+            # Each DR method (aggregate across levels)
+            for dr in DR_METHODS:
+                dr_vals = []
+                for lv in LEVELS:
+                    key = f'{dr}_{lv}'
+                    if dtype in synth_raw:
+                        for r in synth_raw[dtype]:
+                            rd = r.get('results', r)
+                            if cn in rd:
+                                v = rd[cn].get(key)
+                                if v is not None:
+                                    dr_vals.append(v)
+                labels.append(dr)
+                data_to_plot.append(dr_vals if dr_vals else [0])
+            
+            bp = ax.boxplot(data_to_plot, labels=labels, patch_artist=True, widths=0.6)
+            colors = ['#CCCCCC', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+            for patch, color in zip(bp['boxes'], colors):
+                patch.set_facecolor(color)
+                patch.set_alpha(0.7)
+            
+            ax.set_title(dtype, fontsize=12)
+            ax.set_ylabel('ARI' if di == 0 else '')
+            ax.tick_params(axis='x', rotation=45)
+            ax.grid(axis='y', alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(FIGURES_DIR, f'figure_{CLUSTERING.index(cn)+2}_boxplot_{safe_cn}.png'), 
+                    dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f'  Generated figure_{CLUSTERING.index(cn)+2}_boxplot_{safe_cn}.png')
+
+
 def generate_real_boxplots(real):
-    """Figures for real-world data: boxplots per clustering algorithm."""
+    """Boxplots for real-world data per clustering algorithm."""
     datasets = sorted(real.keys())
     
     for cn in CLUSTERING:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
         safe_cn = cn.replace('-', '_')
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
         fig.suptitle(f'ARI Distribution for {cn} on Real-World Data', fontsize=14, fontweight='bold')
         
         for li, lv in enumerate(LEVELS):
@@ -414,16 +456,14 @@ def generate_real_boxplots(real):
             data_to_plot = []
             tick_labels = ['No DR'] + DR_METHODS
             
-            # No Reduction
             nr_vals = []
             for ds in datasets:
                 if cn in real[ds]:
                     v = real[ds][cn].get('No Reduction')
                     if v is not None:
                         nr_vals.append(v)
-            data_to_plot.append(nr_vals)
+            data_to_plot.append(nr_vals if nr_vals else [0])
             
-            # Each DR method
             for dr in DR_METHODS:
                 key = f'{dr}_{lv}'
                 vals = []
@@ -432,7 +472,7 @@ def generate_real_boxplots(real):
                         v = real[ds][cn].get(key)
                         if v is not None:
                             vals.append(v)
-                data_to_plot.append(vals)
+                data_to_plot.append(vals if vals else [0])
             
             bp = ax.boxplot(data_to_plot, labels=tick_labels, patch_artist=True)
             colors = ['#CCCCCC', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
@@ -450,66 +490,6 @@ def generate_real_boxplots(real):
         plt.savefig(os.path.join(FIGURES_DIR, f'boxplot_{safe_cn}_real.png'), dpi=150, bbox_inches='tight')
         plt.close()
         print(f'  Generated boxplot_{safe_cn}_real.png')
-
-
-def generate_synthetic_boxplots(synth_raw):
-    """Figures for synthetic data: boxplots per clustering algorithm.
-    Each boxplot shows ARI values across all synthetic datasets/repeats."""
-    if not synth_raw:
-        print('  No raw synthetic data available for boxplots')
-        return
-    
-    for cn in CLUSTERING:
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharey=True)
-        safe_cn = cn.replace('-', '_')
-        fig.suptitle(f'ARI Distribution for {cn} on Synthetic Data', fontsize=14, fontweight='bold')
-        
-        for li, lv in enumerate(LEVELS):
-            ax = axes[li]
-            data_to_plot = []
-            tick_labels = ['No DR'] + DR_METHODS
-            
-            # Collect values across all synthetic types and repeats
-            # No Reduction
-            nr_vals = []
-            for dtype in SYNTH_TYPES:
-                if dtype in synth_raw:
-                    for repeat_data in synth_raw[dtype]:
-                        if cn in repeat_data:
-                            v = repeat_data[cn].get('No Reduction')
-                            if v is not None:
-                                nr_vals.append(v)
-            data_to_plot.append(nr_vals)
-            
-            # Each DR method
-            for dr in DR_METHODS:
-                key = f'{dr}_{lv}'
-                vals = []
-                for dtype in SYNTH_TYPES:
-                    if dtype in synth_raw:
-                        for repeat_data in synth_raw[dtype]:
-                            if cn in repeat_data:
-                                v = repeat_data[cn].get(key)
-                                if v is not None:
-                                    vals.append(v)
-                data_to_plot.append(vals)
-            
-            bp = ax.boxplot(data_to_plot, labels=tick_labels, patch_artist=True)
-            colors = ['#CCCCCC', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
-            for patch, color in zip(bp['boxes'], colors):
-                patch.set_facecolor(color)
-                patch.set_alpha(0.7)
-            
-            ax.set_title(f'Reduction: {lv}', fontsize=12)
-            ax.set_ylabel('ARI' if li == 0 else '')
-            ax.tick_params(axis='x', rotation=45)
-            ax.grid(axis='y', alpha=0.3)
-            ax.set_ylim(-0.2, 1.05)
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(FIGURES_DIR, f'boxplot_{safe_cn}_synthetic.png'), dpi=150, bbox_inches='tight')
-        plt.close()
-        print(f'  Generated boxplot_{safe_cn}_synthetic.png')
 
 
 def generate_heatmaps(real):
@@ -544,8 +524,8 @@ def generate_heatmaps(real):
         print(f'  Generated heatmap_{safe_cn}_real.png')
 
 
-def generate_summary_table(real, synth):
-    """Generate a summary table comparing paper's key findings."""
+def generate_summary(real, synth):
+    """Generate a summary comparing with paper's key findings."""
     datasets = sorted(real.keys())
     
     with open(os.path.join(TABLES_DIR, 'summary.txt'), 'w') as f:
@@ -556,7 +536,6 @@ def generate_summary_table(real, synth):
             f.write(f'\n{cn}:\n')
             f.write('-' * 60 + '\n')
             
-            # Real-world: mean ARI for No Reduction vs each DR
             nr_vals = []
             for ds in datasets:
                 if cn in real[ds]:
@@ -567,6 +546,8 @@ def generate_summary_table(real, synth):
             mean_nr = np.mean(nr_vals) if nr_vals else 0
             f.write(f'  No Reduction (real): mean ARI = {mean_nr:.3f}\n')
             
+            best_dr = None
+            best_mean = mean_nr
             for dr in DR_METHODS:
                 for lv in LEVELS:
                     key = f'{dr}_{lv}'
@@ -579,6 +560,14 @@ def generate_summary_table(real, synth):
                     mean_v = np.mean(vals) if vals else 0
                     diff = mean_v - mean_nr
                     f.write(f'  {dr} ({lv}): mean ARI = {mean_v:.3f} ({"+" if diff >= 0 else ""}{diff:.3f})\n')
+                    if mean_v > best_mean:
+                        best_mean = mean_v
+                        best_dr = f'{dr} ({lv})'
+            
+            if best_dr:
+                f.write(f'  >>> Best DR: {best_dr} (mean ARI = {best_mean:.3f})\n')
+            else:
+                f.write(f'  >>> No DR method improves over baseline\n')
             
             # Synthetic
             f.write(f'\n  Synthetic data:\n')
@@ -587,7 +576,7 @@ def generate_summary_table(real, synth):
                     nr = synth[dtype][cn].get('No Reduction', 0)
                     f.write(f'    {dtype}: NR={nr:.3f}')
                     best_key = None
-                    best_val = nr
+                    best_val = nr if nr else 0
                     for dr in DR_METHODS:
                         for lv in LEVELS:
                             key = f'{dr}_{lv}'
@@ -596,34 +585,45 @@ def generate_summary_table(real, synth):
                                 best_val = v
                                 best_key = key
                     if best_key:
-                        f.write(f', best DR: {best_key}={best_val:.3f}')
+                        f.write(f', best: {best_key}={best_val:.3f}')
                     f.write('\n')
         
     print('  Generated summary.txt')
 
 
-def compare_with_paper(real):
-    """Compare our real-world k-means results with selected paper values."""
-    # Paper's k-means table (from lines 871-891)
-    paper = {
-        'Breast tissue': 0.27, 'Breast Wisconsin': 0.67, 'Ecoli': 0.51,
-        'Glass': 0.18, 'Haberman': 0.00, 'Ionosphere': 0.17,
-        'Iris': 0.62, 'Wine': 0.90, 'Yeast': 0.16,
+def generate_paper_comparison(real):
+    """Compare our results with paper's Table A.5 (k-means)."""
+    # Paper values for k-means No Reduction (from tex lines 871-891)
+    paper_kmeans_nr = {
+        'Breast_tissue': 0.34, 'Breast_Wisconsin': 0.77, 'Ecoli': 0.65,
+        'Glass': 0.18, 'Haberman': 0.10, 'Ionosphere': 0.18,
+        'Iris': 0.57, 'Movement_libras': 0.34, 'Musk': 0.01,
+        'Parkinsons': 0.12, 'Segmentation': 0.43, 'Sonar_all': 0.00,
+        'Spectf': -0.10, 'Transfusion': 0.03, 'Vehicle': 0.11,
+        'Vertebral_column': 0.11, 'Vowel_context': 0.11, 'Wine': 0.91,
+        'Wine_quality_red': 0.08, 'Yeast': 0.19,
     }
     
     with open(os.path.join(TABLES_DIR, 'paper_comparison.txt'), 'w') as f:
-        f.write('Comparison of our k-means (No Reduction) results with paper values\n')
+        f.write('Comparison of our k-means (No Reduction) ARI with paper values\n')
         f.write('=' * 60 + '\n')
         f.write(f'{"Dataset":<22}{"Paper":>8}{"Ours":>8}{"Diff":>8}\n')
         f.write('-' * 60 + '\n')
         
-        for ds_paper, paper_val in paper.items():
+        total_diff = 0
+        count = 0
+        for ds_paper, paper_val in sorted(paper_kmeans_nr.items()):
             for ds_ours in real:
                 if ds_paper.lower().replace(' ', '').replace('_', '') == ds_ours.lower().replace(' ', '').replace('_', ''):
                     our_val = real[ds_ours].get('k-means', {}).get('No Reduction', 0)
                     diff = our_val - paper_val
+                    total_diff += abs(diff)
+                    count += 1
                     f.write(f'{ds_paper:<22}{paper_val:>8.2f}{our_val:>8.2f}{diff:>+8.2f}\n')
                     break
+        
+        f.write('-' * 60 + '\n')
+        f.write(f'Mean absolute difference: {total_diff/count:.3f}\n')
     
     print('  Generated paper_comparison.txt')
 
@@ -636,7 +636,7 @@ def main():
     print(f'Synthetic types: {list(synth.keys())}')
     if synth_raw:
         for dtype in synth_raw:
-            print(f'  {dtype}: {len(synth_raw[dtype])} repeats')
+            print(f'  {dtype}: {len(synth_raw[dtype])} configs/repeats')
     
     print('\n--- Synthetic Tables (A.1-A.4) ---')
     generate_synthetic_tables(synth)
@@ -650,20 +650,20 @@ def main():
     print('\n--- Wilcoxon Test (A.9) ---')
     generate_wilcoxon(real)
     
-    print('\n--- Real-World Boxplots ---')
-    generate_real_boxplots(real)
-    
     print('\n--- Synthetic Boxplots ---')
     generate_synthetic_boxplots(synth_raw)
+    
+    print('\n--- Real-World Boxplots ---')
+    generate_real_boxplots(real)
     
     print('\n--- Heatmaps ---')
     generate_heatmaps(real)
     
     print('\n--- Summary ---')
-    generate_summary_table(real, synth)
+    generate_summary(real, synth)
     
     print('\n--- Paper Comparison ---')
-    compare_with_paper(real)
+    generate_paper_comparison(real)
     
     print('\n\nAll tables and figures generated!')
     print(f'Tables: {TABLES_DIR}/')
