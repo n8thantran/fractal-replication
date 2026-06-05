@@ -4,7 +4,7 @@ With parameter search for AHC, GMM, and OPTICS.
 """
 
 import numpy as np
-from sklearn.cluster import KMeans, AgglomerativeClustering, OPTICS
+from sklearn.cluster import KMeans, AgglomerativeClustering, OPTICS, cluster_optics_xi
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics import adjusted_rand_score
 import warnings
@@ -20,7 +20,6 @@ def run_kmeans(X, n_clusters, **kwargs):
 
 def run_ahc(X, n_clusters, affinity='euclidean', linkage='ward', **kwargs):
     """Agglomerative Hierarchical Clustering."""
-    # Ward only works with euclidean
     if linkage == 'ward' and affinity != 'euclidean':
         affinity = 'euclidean'
     
@@ -110,20 +109,37 @@ def find_best_gmm_params(X, y, n_clusters):
 
 
 def find_best_optics_params(X, y, n_clusters):
-    """Find best OPTICS parameters."""
+    """Find best OPTICS parameters. Optimized: fit once per min_samples, vary xi."""
     best_ari = -2
     best_params = {'min_samples': 5, 'min_cluster_size': 0.05}
     
+    xi_values = np.arange(0.01, 1.01, 0.05)
+    
     for min_samples in range(5, 11):
-        for xi_val in np.arange(0.01, 1.01, 0.05):
-            try:
-                labels = run_optics(X, n_clusters, min_samples=min_samples, min_cluster_size=xi_val)
-                ari = adjusted_rand_score(y, labels)
-                if ari > best_ari:
-                    best_ari = ari
-                    best_params = {'min_samples': min_samples, 'min_cluster_size': xi_val}
-            except Exception:
-                continue
+        try:
+            # Fit OPTICS once (the expensive part)
+            optics = OPTICS(min_samples=min_samples, cluster_method='xi', xi=0.05)
+            optics.fit(X)
+            
+            # Try different xi values using the same reachability ordering (fast)
+            for xi_val in xi_values:
+                try:
+                    labels, _ = cluster_optics_xi(
+                        reachability=optics.reachability_,
+                        predecessor=optics.predecessor_,
+                        ordering=optics.ordering_,
+                        min_samples=min_samples,
+                        xi=xi_val,
+                        predecessor_correction=optics.predecessor_correction
+                    )
+                    ari = adjusted_rand_score(y, labels)
+                    if ari > best_ari:
+                        best_ari = ari
+                        best_params = {'min_samples': min_samples, 'min_cluster_size': xi_val}
+                except Exception:
+                    continue
+        except Exception:
+            continue
     
     return best_params, best_ari
 
