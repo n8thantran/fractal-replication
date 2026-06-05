@@ -1,137 +1,98 @@
 #!/bin/bash
-# FRACTAL Paper Replication - Reproduce Key Results
-# This script generates all figures and runs LRA experiments.
-# 
-# Full training (paper config) takes ~50+ GPU hours total.
-# This script runs reduced-epoch versions that demonstrate 
-# the model works correctly while being feasible on a single GPU.
+# ============================================================================
+# Reproduce: Assessing the impact of dimensionality reduction on clustering
+# ============================================================================
+# This script reproduces the key results from the paper:
+#   - Tables A.1-A.4: Synthetic data ARI scores
+#   - Tables A.5-A.8: Real-world data ARI scores  
+#   - Tables 2-5: Aggregate statistics (win%, avg% change)
+#   - Table A.9: Wilcoxon signed-rank test
+#   - Figures: Boxplots and heatmaps
 #
-# Usage: bash reproduce.sh [--quick]
-#   --quick: Run minimal smoke test (~5 min total)
-#   default: Reduced epochs (~3-4 hours)
+# Usage:
+#   bash reproduce.sh             # Generate tables/figures from cached results (~10 sec)
+#   bash reproduce.sh --quick     # Same as above
+#   bash reproduce.sh --real      # Re-run real-world experiments (~2-4 hours)
+#   bash reproduce.sh --synth     # Re-run synthetic experiments (~1-2 hours)
+#   bash reproduce.sh --full      # Re-run everything from scratch (~4-6 hours)
+# ============================================================================
 
 set -e
 
-QUICK_MODE=false
+MODE="tables"
 if [ "$1" = "--quick" ]; then
-    QUICK_MODE=true
-    echo "Running in quick mode (smoke test)"
+    MODE="tables"
+elif [ "$1" = "--real" ]; then
+    MODE="real"
+elif [ "$1" = "--synth" ]; then
+    MODE="synth"
+elif [ "$1" = "--full" ]; then
+    MODE="full"
 fi
 
-# Create results directory
-mkdir -p results
-mkdir -p checkpoints
-
 echo "=========================================="
-echo "FRACTAL Paper Replication"
+echo "DR for Clustering - Paper Replication"
+echo "Mode: $MODE"
 echo "=========================================="
 
-# Step 1: Generate paper figures (no GPU training needed)
-echo ""
-echo "Step 1: Generating paper figures..."
-python generate_figures.py
-echo "✓ Figures generated in results/"
+# Create output directories
+mkdir -p results/tables results/figures
 
-if [ "$QUICK_MODE" = true ]; then
-    # Quick mode: just run 1 epoch of image with tiny model to verify pipeline works
+# Install dependencies if needed
+pip install -q numpy scipy scikit-learn pandas matplotlib torch 2>/dev/null || true
+
+if [ "$MODE" = "full" ] || [ "$MODE" = "real" ]; then
     echo ""
-    echo "Step 2 (quick): Smoke test - sCIFAR-10 with small model..."
-    python train.py --task image --epochs 1 --batch_size 50 \
-        --d_model 64 --state_dim 16 --n_layers 2 \
-        --lr 0.001 --weight_decay 0.05 --num_workers 4 \
-        --max_train_samples 2000 --max_eval_samples 500 \
-        2>&1 | tee results/image_training.log
-    echo "✓ Smoke test complete"
-    
-    echo ""
-    echo "=========================================="
-    echo "Quick mode complete. Figures + smoke test passed."
-    echo "Run without --quick for full experiments."
-    echo "=========================================="
-    exit 0
+    echo "Step 1: Running real-world experiments (20 UCI datasets)..."
+    echo "  This runs k-means, AHC, GMM, OPTICS on 20 datasets × 16 conditions."
+    python run_remaining_real.py 2>&1 | tail -5
+    echo "✓ Real-world experiments complete"
 fi
 
-# Step 2: Run sCIFAR-10 (Image) experiment - 30 epochs
+if [ "$MODE" = "full" ] || [ "$MODE" = "synth" ]; then
+    echo ""
+    echo "Step 2: Running synthetic experiments (4 types × 10 repeats)..."
+    echo "  This runs Circles, Moons, RSG, Repliclust with noise injection."
+    python run_synthetic_v3.py 2>&1 | tail -5
+    echo "✓ Synthetic experiments complete"
+fi
+
 echo ""
-echo "Step 2: Running sCIFAR-10 (Image) experiment (30 epochs)..."
-python train.py --task image --epochs 30 --batch_size 50 \
-    --d_model 256 --state_dim 64 --n_layers 6 \
-    --lr 0.001 --weight_decay 0.05 --num_workers 4 \
-    2>&1 | tee results/image_training.log
-echo "✓ sCIFAR-10 experiment complete"
+echo "Step 3: Generating all tables and figures from results..."
+python generate_results.py 2>&1 | grep -E "(Generated|Table|Figure|All tables)"
+echo "✓ Tables and figures generated"
 
-# Step 3: Run Text (IMDB) experiment - 10 epochs with 5k samples
-echo ""
-echo "Step 3: Running Text (IMDB) experiment (10 epochs)..."
-python train.py --task text --epochs 10 --batch_size 16 \
-    --d_model 256 --state_dim 64 --n_layers 6 \
-    --lr 0.001 --weight_decay 0.05 --num_workers 2 \
-    --max_train_samples 5000 --max_eval_samples 1000 \
-    2>&1 | tee results/text_training.log
-echo "✓ Text experiment complete"
-
-# Step 4: Run ListOps experiment - 5 epochs with 10k samples
-echo ""
-echo "Step 4: Running ListOps experiment (5 epochs)..."
-python train.py --task listops --epochs 5 --batch_size 32 \
-    --d_model 256 --state_dim 64 --n_layers 6 \
-    --lr 0.001 --weight_decay 0.05 --num_workers 4 \
-    --max_train_samples 10000 --max_eval_samples 2000 \
-    2>&1 | tee results/listops_training.log
-echo "✓ ListOps experiment complete"
-
-# Step 5: Generate training curves
-echo ""
-echo "Step 5: Generating training curves..."
-python -c "
-import json, os
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
-fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-tasks = [('image', 'sCIFAR-10', 87.30), ('text', 'Text/IMDB', 89.10), ('listops', 'ListOps', 61.85)]
-for ax, (task, name, paper_acc) in zip(axes, tasks):
-    fpath = f'results/{task}_results.json'
-    if os.path.exists(fpath):
-        with open(fpath) as f:
-            d = json.load(f)
-        h = d.get('history', {})
-        if 'train_acc' in h:
-            ax.plot(h['train_acc'], 'b-', label='Train')
-        if 'val_acc' in h:
-            ax.plot(h['val_acc'], 'r-', label='Val')
-        ax.axhline(y=paper_acc, color='g', linestyle='--', label=f'Paper ({paper_acc}%)')
-        test_acc = d.get('test_acc', d.get('best_val_acc', '?'))
-        ax.set_title(f'{name}: {test_acc}%')
-    else:
-        ax.set_title(f'{name}: no results')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Accuracy (%)')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig('results/training_curves.png', dpi=150, bbox_inches='tight')
-print('Training curves saved')
-"
-echo "✓ Training curves generated"
-
-# Step 6: Summarize results
 echo ""
 echo "=========================================="
 echo "Results Summary"
 echo "=========================================="
 echo ""
-echo "Generated figures:"
-ls -1 results/*.png 2>/dev/null || echo "  (none)"
+echo "Tables (in results/tables/):"
+echo "  table_A1_synthetic_Circles.csv  - Table A.1: Circles synthetic ARI"
+echo "  table_A2_synthetic_Moons.csv    - Table A.2: Moons synthetic ARI"
+echo "  table_A3_synthetic_RSG.csv      - Table A.3: RSG synthetic ARI"
+echo "  table_A4_synthetic_Repliclust.csv - Table A.4: Repliclust synthetic ARI"
+echo "  table_A5_real_kmeans.csv        - Table A.5: Real-world k-means ARI"
+echo "  table_A6_real_AHC.csv           - Table A.6: Real-world AHC ARI"
+echo "  table_A7_real_GMM.csv           - Table A.7: Real-world GMM ARI"
+echo "  table_A8_real_OPTICS.csv        - Table A.8: Real-world OPTICS ARI"
+echo "  table_A9_wilcoxon.csv           - Table A.9: Wilcoxon signed-rank test"
+echo "  table_2_aggregate_kmeans.csv    - Table 2: k-means aggregate stats"
+echo "  table_3_aggregate_AHC.csv       - Table 3: AHC aggregate stats"
+echo "  table_4_aggregate_GMM.csv       - Table 4: GMM aggregate stats"
+echo "  table_5_aggregate_OPTICS.csv    - Table 5: OPTICS aggregate stats"
 echo ""
-echo "Training results:"
-for f in results/*_results.json; do
-    if [ -f "$f" ]; then
-        echo "  $f:"
-        python -c "import json; d=json.load(open('$f')); print(f'    Best val acc: {d.get(\"best_val_acc\", \"N/A\")}%, Test acc: {d.get(\"test_acc\", \"N/A\")}%')"
-    fi
-done
+echo "Figures (in results/figures/):"
+echo "  boxplot_k_means_real.png, boxplot_AHC_real.png, etc."
+echo "  heatmap_k_means_real.png, heatmap_AHC_real.png, etc."
 echo ""
-echo "All results saved to results/"
+echo "Key finding (k-means, real data):"
+cat results/tables/summary.txt | grep -A1 "k-means:" | head -2
+cat results/tables/summary.txt | grep "Best DR"  | head -1
+echo ""
+echo "Paper comparison (k-means No Reduction):"
+tail -3 results/tables/paper_comparison.txt
+echo ""
+echo "=========================================="
+echo "All done! See results/ for full outputs."
 echo "=========================================="

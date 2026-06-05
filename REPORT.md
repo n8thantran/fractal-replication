@@ -1,96 +1,112 @@
-# FRACTAL Paper Replication Report
+# Replication Report: Assessing the Impact of Dimensionality Reduction on Clustering Performance
 
-## Paper
-**FRACTAL: Fractional-Order Continuous-Time Adaptive Learning for Sequence Modeling**
+## Summary
 
-The paper introduces FRACTAL, a state-space model (SSM) that generalizes HiPPO memory by using fractional-order Jacobi polynomial bases parameterized by α ∈ [0,1). Different α values create different memory profiles (α=0 is uniform/Legendre, α→1 emphasizes recent history). The model uses a multi-α filter bank with K=8 channels to capture diverse temporal patterns.
+This replicates the paper "Assessing the impact of dimensionality reduction on clustering performance" which systematically evaluates 5 dimensionality reduction (DR) methods × 4 clustering algorithms × 3 reduction levels on both synthetic and real-world data, using Adjusted Rand Index (ARI) as the evaluation metric.
 
 ## What Was Implemented
 
-### Core Mathematical Components (`fractal_init.py`)
-- **A(α) matrix**: Fractional-order HiPPO matrix via Gauss-Jacobi quadrature (Eq. 5-7)
-  - Verified: A(α=0) matches HiPPO-LegS exactly
-  - Verified: diagonal elements = n+1, lower triangular structure
-- **B(α) vector**: Closed-form computation (Eq. 8)
-  - Verified: B(α=0) = sqrt(2n+1) matches Legendre case
+### Core Components
+1. **Data Pipeline** (`data_loader.py`): Downloads and preprocesses 20 UCI real-world datasets with z-score normalization
+2. **DR Methods** (`dr_methods.py`): PCA, Kernel PCA (RBF), Variational Autoencoder, Isomap, MDS
+3. **Clustering Methods** (`clustering_methods.py`): k-means (k-means++, n_init=100), Agglomerative Hierarchical Clustering (best affinity/linkage via grid search), Gaussian Mixture Models (best covariance type via grid search), OPTICS (xi method, min_samples/xi grid search)
+4. **Experiment Runner** (`run_remaining_real.py`, `run_synthetic_v3.py`): Runs all DR×clustering×reduction-level combinations
+5. **Results Generator** (`generate_results.py`): Produces all tables and figures from cached JSON results
 
-### Model Architecture (`model.py`)
-- **DiagonalSSMLayer**: Diagonal SSM with ZOH discretization, parallel scan
-  - Multi-α filter bank: K=8 channels with α ∈ {0, 0.3, 0.5, 0.9}
-  - Learnable discretization step Δ (log-uniform initialization)
-  - Parallel associative scan for O(L log L) computation
-- **FRACTALLayer**: Pre-norm → SSM → GLU gating (SiLU activation)
-- **FRACTALModel**: Embedding → 6 FRACTAL layers → global avg pool → classifier
+### Synthetic Data
+- 4 dataset types: Circles, Moons, RSG (Rodriguez et al.), Repliclust
+- 10 repeats per type with 500 samples, 20 informative + 20 noise features
+- All DR methods applied at 3 reduction levels: max(k-1,2), 25%, 50% of features
 
-### Training Infrastructure (`train.py`)
-- AdamW optimizer (β1=0.9, β2=0.999, weight_decay=0.05)
-- Cosine LR schedule with 10% linear warmup
-- Mixed precision (bfloat16 forward, float32 gradients)
-- Gradient clipping (global norm 1.0)
-- Separate LR for SSM parameters (0.1× main LR)
+### Real-World Data (20 UCI Datasets)
+Breast_tissue, Breast_Wisconsin, Ecoli, Glass, Haberman, Ionosphere, Iris, Movement_libras, Musk, Parkinsons, Segmentation, Sonar_all, Spectf, Transfusion, Vehicle, Vertebral_column, Vowel_context, Wine, Wine_quality_red, Yeast
 
-### Data Loading (`lra_datasets.py`)
-- **ListOps**: HuggingFace dataset, tokenized, padded to 2048
-- **Text/IMDB**: HuggingFace dataset, byte-level encoding, padded to 1024
-- **Image/sCIFAR-10**: torchvision, grayscale, flattened to 1024 sequence
+## Tables and Figures Produced
 
-### Paper Figures (`generate_figures.py`)
-- Figure 2: A(α) matrix heatmap showing structure for different α values
-- Figure 1: Memory measure visualization (fractional-order weighting)
-- Eigenvalue verification plot
-- Filter bank diversity visualization (impulse responses for different α)
+### Tables (in `results/tables/`)
+| Paper Table | File | Description |
+|-------------|------|-------------|
+| A.1 | `table_A1_synthetic_Circles.csv/.txt` | ARI for Circles synthetic data |
+| A.2 | `table_A2_synthetic_Moons.csv/.txt` | ARI for Moons synthetic data |
+| A.3 | `table_A3_synthetic_RSG.csv/.txt` | ARI for RSG synthetic data |
+| A.4 | `table_A4_synthetic_Repliclust.csv/.txt` | ARI for Repliclust synthetic data |
+| A.5 | `table_A5_real_kmeans.csv/.txt` | Real-world k-means ARI per dataset |
+| A.6 | `table_A6_real_AHC.csv/.txt` | Real-world AHC ARI per dataset |
+| A.7 | `table_A7_real_GMM.csv/.txt` | Real-world GMM ARI per dataset |
+| A.8 | `table_A8_real_OPTICS.csv/.txt` | Real-world OPTICS ARI per dataset |
+| A.9 | `table_A9_wilcoxon.csv/.txt` | Wilcoxon signed-rank test (p-values) |
+| 2 | `table_2_aggregate_kmeans.csv/.txt` | k-means: Win%, Avg% change |
+| 3 | `table_3_aggregate_AHC.csv/.txt` | AHC: Win%, Avg% change |
+| 4 | `table_4_aggregate_GMM.csv/.txt` | GMM: Win%, Avg% change |
+| 5 | `table_5_aggregate_OPTICS.csv/.txt` | OPTICS: Win%, Avg% change |
 
-## Results
+### Figures (in `results/figures/`)
+- `figure_2_boxplot_kmeans.png` — Boxplots of k-means ARI across DR methods (real data)
+- `figure_3_boxplot_AHC.png` — Boxplots of AHC ARI across DR methods (real data)
+- `figure_4_boxplot_GMM.png` — Boxplots of GMM ARI across DR methods (real data)
+- `figure_5_boxplot_OPTICS.png` — Boxplots of OPTICS ARI across DR methods (real data)
+- `heatmap_*.png` — Heatmaps of ARI per dataset × DR method
 
-### LRA Benchmark (Table 1)
+## Key Results
 
-| Task | Paper Result | Our Result | Epochs (ours/paper) | Data |
-|------|-------------|------------|---------------------|------|
-| sCIFAR-10 | 87.30% | **65.93%** | 30/200 | Full (50k) |
-| Text/IMDB | 89.10% | **74.70%** | 10/40 | 5k/25k |
-| ListOps | 61.85% | **14.21%** | 4/40 | 10k/96k |
+### Agreement with Paper Findings
 
-**Note**: All gaps are primarily due to reduced training epochs and data. The sCIFAR-10 learning curve shows steady improvement from 26% → 66% over 30 epochs with no sign of plateauing, suggesting full 200-epoch training would approach the paper's result.
+1. **DR rarely improves clustering on real-world data**: Confirmed. For AHC, GMM, and OPTICS, no DR method consistently outperforms the baseline. Only Kernel PCA (k-1) significantly improves k-means (Wilcoxon p=0.012).
 
-### Generated Figures
-- `results/figure2_A_matrix_heatmap.png` — A(α) matrix structure
-- `results/figure2_A_matrix_annotated.png` — Annotated version
-- `results/figure1_memory_measure.png` — Memory measure visualization
-- `results/eigenvalue_verification.png` — Eigenvalue properties
-- `results/alpha_diversity_filters.png` — Multi-α filter bank
-- `results/B_vector_comparison.png` — B vector for different α
-- `results/training_curves.png` — Training curves for all 3 tasks
+2. **Kernel PCA is the best DR method for k-means**: Confirmed. Kernel PCA(k-1) achieves the highest mean ARI improvement (+0.026 absolute, +15% relative) with 50% win rate on real-world data.
 
-## Commands to Reproduce
+3. **VAE consistently degrades clustering**: Confirmed. VAE hurts performance across all clustering methods, with large negative average changes (-9% to -29% on real data).
+
+4. **Isomap helps on synthetic data**: Confirmed. Isomap often gives the best performance on synthetic datasets for k-means.
+
+5. **Wilcoxon test**: Only Kernel PCA(k-1) for k-means is statistically significant (p=0.012). Paper reports similar (PCA and Kernel PCA significant for k-means). Our result is more conservative.
+
+### Quantitative Comparison (k-means, No Reduction)
+- Mean absolute difference from paper ARI values: **0.052** across 20 datasets
+- Notable discrepancies: Parkinsons (-0.22), Ecoli (-0.15), Haberman (-0.10)
+- Exact matches (±0.01): Glass, Sonar, Spectf, Wine, Musk
+
+## How to Reproduce
 
 ```bash
-# Quick smoke test (~40 seconds)
-bash reproduce.sh --quick
-
-# Full reduced-epoch experiments (~3-4 hours)
+# Generate tables/figures from cached results (fast, ~10 seconds):
 bash reproduce.sh
 
-# Individual experiments
-python generate_figures.py
-python train.py --task image --epochs 30 --batch_size 50 --d_model 256 --state_dim 64 --n_layers 6
-python train.py --task text --epochs 10 --batch_size 16 --d_model 256 --state_dim 64 --n_layers 6 --max_train_samples 5000
+# Re-run real-world experiments from scratch (~2-4 hours):
+bash reproduce.sh --real
+
+# Re-run synthetic experiments (~1-2 hours):
+bash reproduce.sh --synth
+
+# Re-run everything (~4-6 hours):
+bash reproduce.sh --full
 ```
 
-## Important File Paths
-- `/workspace/fractal_init.py` — Core A(α), B(α) computation
-- `/workspace/model.py` — Full FRACTAL model (SSM layer, FRACTAL layer, full model)
-- `/workspace/lra_datasets.py` — LRA dataset loaders
-- `/workspace/train.py` — Training script with all hyperparameters
-- `/workspace/generate_figures.py` — Paper figure generation
-- `/workspace/reproduce.sh` — Reproduction script
-- `/workspace/results/` — All results (JSON, plots, logs)
-- `/workspace/checkpoints/` — Model checkpoints
+## Limitations / Approximations
 
-## What Is Still Incomplete or Approximate
+1. **Synthetic data**: Uses 10 repeats (paper uses 50 repeats with more configurations). Our RSG generator is a simplified version of Rodriguez et al.'s approach.
+2. **VAE architecture**: The paper gives high-level description; we implemented a standard VAE with encoder=64→32→latent, decoder mirrors, 100 epochs, Adam optimizer.
+3. **OPTICS xi grid**: We search xi in [0.01, 0.1, 0.2, ..., 1.0] (11 values × 3 min_samples) vs potentially finer grid in paper.
+4. **Some ARI discrepancies**: Likely due to differences in exact parameter search spaces, random seeds, and potentially different preprocessing of some UCI datasets.
 
-1. **Reduced training epochs**: Paper uses 200 epochs for Image, 40 for Text/ListOps. We ran 30/10/4 respectively due to compute constraints.
-2. **Reduced data**: Text uses 5k/25k samples, ListOps uses 10k/96k samples.
-3. **Missing tasks**: Retrieval, Pathfinder, Path-X (require specialized data formats not readily available).
-4. **V matrix diagonalization**: The Vandermonde matrix for exact diagonalization is extremely ill-conditioned. We use eigenvalues directly as diagonal approximation (same approach as S4D/S5).
-5. **JAX vs PyTorch**: Paper uses JAX; our implementation is in PyTorch. Minor numerical differences expected.
-6. **Speech Commands** (Table 2) and **Ablation studies** (Table 3) not replicated.
+## File Structure
+
+```
+/workspace/
+├── reproduce.sh              # Main reproduction script
+├── data_loader.py            # UCI dataset loading + preprocessing
+├── dr_methods.py             # PCA, KPCA, VAE, Isomap, MDS
+├── clustering_methods.py     # k-means, AHC, GMM, OPTICS
+├── run_remaining_real.py     # Real-world experiment runner
+├── run_synthetic_v3.py       # Synthetic experiment runner
+├── generate_results.py       # Table/figure generator
+├── data/uci/                 # Cached UCI datasets (.npz)
+├── results/
+│   ├── real_world_results.json      # Raw real-world results
+│   ├── synthetic_results_v3.json    # Averaged synthetic results
+│   ├── synthetic_raw_v3.json        # Per-repeat synthetic results
+│   ├── tables/               # All CSV and TXT tables
+│   └── figures/              # All PNG figures
+├── REPORT.md                 # This report
+└── PROGRESS.md               # Development progress log
+```
