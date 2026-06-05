@@ -1,0 +1,103 @@
+SUMMARY OF KEY FINDINGS
+================================================================================
+
+
+k-means:
+------------------------------------------------------------
+  No Reduction (real): mean ARI = 0.230
+  PCA (k-1): mean ARI = 0.233 (+0.003)
+  PCA (25%): mean ARI = 0.228 (-0.002)
+  PCA (50%): mean ARI = 0.234 (+0.004)
+  Kernel PCA (k-1): mean ARI = 0.256 (+0.026)
+  Kernel PCA (25%): mean ARI = 0.239 (+0.009)
+  Kernel PCA (50%): mean ARI = 0.243 (+0.014)
+  VAE (k-1): mean ARI = 0.172 (-0.058)
+  VAE (25%): mean ARI = 0.144 (-0.086)
+  VAE (50%): mean ARI = 0.129 (-0.101)
+  Isomap (k-1): mean ARI = 0.244 (+0.014)
+  Isomap (25%): mean ARI = 0.235 (+0.005)
+  Isomap (50%): mean ARI = 0.244 (+0.014)
+  MDS (k-1): mean ARI = 0.227 (-0.003)
+  MDS (25%): mean ARI = 0.221 (-0.009)
+  MDS (50%): mean ARI = 0.231 (+0.001)
+
+  Synthetic data:
+    Circles: NR=0.119, best DR: Isomap_50%=0.136
+    Moons: NR=0.468, best DR: Kernel PCA_k-1=0.555
+    RSG: NR=0.977, best DR: Isomap_k-1=0.999
+    Repliclust: NR=1.000
+
+AHC:
+------------------------------------------------------------
+  No Reduction (real): mean ARI = 0.291
+  PCA (k-1): mean ARI = 0.264 (-0.028)
+  PCA (25%): mean ARI = 0.256 (-0.036)
+  PCA (50%): mean ARI = 0.265 (-0.026)
+  Kernel PCA (k-1): mean ARI = 0.263 (-0.029)
+  Kernel PCA (25%): mean ARI = 0.249 (-0.043)
+  Kernel PCA (50%): mean ARI = 0.257 (-0.035)
+  VAE (k-1): mean ARI = 0.183 (-0.108)
+  VAE (25%): mean ARI = 0.132 (-0.160)
+  VAE (50%): mean ARI = 0.148 (-0.144)
+  Isomap (k-1): mean ARI = 0.255 (-0.036)
+  Isomap (25%): mean ARI = 0.262 (-0.029)
+  Isomap (50%): mean ARI = 0.263 (-0.028)
+  MDS (k-1): mean ARI = 0.255 (-0.037)
+  MDS (25%): mean ARI = 0.248 (-0.044)
+  MDS (50%): mean ARI = 0.259 (-0.032)
+
+  Synthetic data:
+    Circles: NR=0.093, best DR: Isomap_25%=0.139
+    Moons: NR=0.516, best DR: Isomap_k-1=0.669
+    RSG: NR=0.992, best DR: Isomap_k-1=0.997
+    Repliclust: NR=1.000
+
+GMM:
+------------------------------------------------------------
+  No Reduction (real): mean ARI = 0.292
+  PCA (k-1): mean ARI = 0.255 (-0.037)
+  PCA (25%): mean ARI = 0.242 (-0.050)
+  PCA (50%): mean ARI = 0.252 (-0.040)
+  Kernel PCA (k-1): mean ARI = 0.259 (-0.033)
+  Kernel PCA (25%): mean ARI = 0.223 (-0.069)
+  Kernel PCA (50%): mean ARI = 0.245 (-0.046)
+  VAE (k-1): mean ARI = 0.174 (-0.118)
+  VAE (25%): mean ARI = 0.164 (-0.128)
+  VAE (50%): mean ARI = 0.123 (-0.169)
+  Isomap (k-1): mean ARI = 0.240 (-0.052)
+  Isomap (25%): mean ARI = 0.207 (-0.085)
+  Isomap (50%): mean ARI = 0.235 (-0.057)
+  MDS (k-1): mean ARI = 0.228 (-0.064)
+  MDS (25%): mean ARI = 0.203 (-0.089)
+  MDS (50%): mean ARI = 0.221 (-0.071)
+
+  Synthetic data:
+    Circles: NR=0.103, best DR: Isomap_k-1=0.121
+    Moons: NR=0.513, best DR: Isomap_k-1=0.647
+    RSG: NR=0.970, best DR: Kernel PCA_k-1=0.980
+    Repliclust: NR=0.935, best DR: Kernel PCA_k-1=1.000
+
+OPTICS:
+------------------------------------------------------------
+  No Reduction (real): mean ARI = 0.149
+  PCA (k-1): mean ARI = 0.111 (-0.038)
+  PCA (25%): mean ARI = 0.089 (-0.060)
+  PCA (50%): mean ARI = 0.084 (-0.064)
+  Kernel PCA (k-1): mean ARI = 0.112 (-0.036)
+  Kernel PCA (25%): mean ARI = 0.133 (-0.016)
+  Kernel PCA (50%): mean ARI = 0.105 (-0.043)
+  VAE (k-1): mean ARI = 0.036 (-0.113)
+  VAE (25%): mean ARI = 0.023 (-0.126)
+  VAE (50%): mean ARI = 0.020 (-0.129)
+  Isomap (k-1): mean ARI = 0.077 (-0.071)
+  Isomap (25%): mean ARI = 0.071 (-0.078)
+  Isomap (50%): mean ARI = 0.067 (-0.082)
+  MDS (k-1): mean ARI = 0.093 (-0.055)
+  MDS (25%): mean ARI = 0.086 (-0.063)
+  MDS (50%): mean ARI = 0.120 (-0.029)
+
+  Synthetic data:
+    Circles: NR=0.022, best DR: PCA_k-1=0.282
+    Moons: NR=0.112, best DR: MDS_k-1=0.264
+    RSG: NR=0.856
+    Repliclust: NR=1.000
