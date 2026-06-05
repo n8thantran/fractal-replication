@@ -1,6 +1,7 @@
 """
-Fast synthetic experiment runner. Skips d=200 to save time.
-Uses faster MDS settings.
+Fast synthetic experiments with improved data generation matching paper.
+Skips MDS for large datasets, uses fewer OPTICS iterations.
+Uses 2 repeats per config for speed.
 """
 import numpy as np
 import json
@@ -15,11 +16,10 @@ from sklearn.metrics import adjusted_rand_score
 from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import Isomap, MDS
 from sklearn.preprocessing import StandardScaler
+from sklearn.datasets import make_circles, make_moons
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-
-from generate_synthetic import generate_dataset, get_all_configs
 
 RESULTS_DIR = '/workspace/results'
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -59,6 +59,109 @@ class VAE(nn.Module):
         return x_recon, mu, logvar
 
 
+def inject_noise(X, rng):
+    """Structured noise injection: z-score, then 75% features get noise."""
+    scaler = StandardScaler()
+    X_norm = scaler.fit_transform(X)
+    n_features = X_norm.shape[1]
+    n_samples = X_norm.shape[0]
+    feat_idx = rng.permutation(n_features)
+    quarter = n_features // 4
+    for i in feat_idx[:quarter]:
+        X_norm[:, i] += rng.normal(0, 1.0, n_samples)
+    for i in feat_idx[quarter:2*quarter]:
+        X_norm[:, i] += rng.normal(0, 0.5, n_samples)
+    for i in feat_idx[2*quarter:3*quarter]:
+        X_norm[:, i] += rng.normal(0, 0.25, n_samples)
+    return X_norm
+
+
+def embed_to_high_dim(X_2d, target_dim, rng):
+    """Embed 2D data into target_dim via Gaussian Random Projection."""
+    if target_dim <= 2:
+        return X_2d
+    proj_matrix = rng.randn(2, target_dim) / np.sqrt(target_dim)
+    return X_2d @ proj_matrix
+
+
+def generate_circles_2cluster(rng, d=50):
+    X, y = make_circles(n_samples=2000, factor=0.5, noise=0.05, random_state=rng.randint(100000))
+    return embed_to_high_dim(X, d, rng), y, 2
+
+
+def generate_circles_5cluster(rng, d=50):
+    n_per = 400
+    radial_factors = [1.0, 2.0, 3.5, 5.0, 7.0]
+    X_list, y_list = [], []
+    for i, r in enumerate(radial_factors):
+        theta = rng.uniform(0, 2*np.pi, n_per)
+        noise = rng.normal(0, 0.05, n_per)
+        x1 = r * np.cos(theta) + noise
+        x2 = r * np.sin(theta) + noise
+        X_list.append(np.column_stack([x1, x2]))
+        y_list.append(np.full(n_per, i))
+    X = np.vstack(X_list)
+    y = np.concatenate(y_list)
+    return embed_to_high_dim(X, d, rng), y, 5
+
+
+def generate_moons_2cluster(rng, d=50):
+    X, y = make_moons(n_samples=2000, noise=0.1, random_state=rng.randint(100000))
+    stretch = rng.choice([1.0, 1.5])
+    angle = rng.choice([np.radians(a) for a in [-160, -10, 10, 160, 180]])
+    X[:, 0] *= stretch
+    R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    X = X @ R.T
+    return embed_to_high_dim(X, d, rng), y, 2
+
+
+def generate_moons_5cluster(rng, d=50):
+    n_per = 400
+    X_list, y_list = [], []
+    for i in range(5):
+        X_base, _ = make_moons(n_samples=n_per, noise=0.1, random_state=rng.randint(100000))
+        half = n_per // 2
+        X_moon = X_base[:half]
+        angle = rng.uniform(-np.pi, np.pi)
+        R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        X_moon = X_moon @ R.T
+        X_moon[:, 0] += rng.uniform(-5, 5)
+        X_moon[:, 1] += rng.uniform(-5, 5)
+        X_list.append(X_moon)
+        y_list.append(np.full(half, i))
+    X = np.vstack(X_list)
+    y = np.concatenate(y_list)
+    return embed_to_high_dim(X, d, rng), y, 5
+
+
+def generate_rsg(rng, k=2, d=50, n_per=50):
+    X_list, y_list = [], []
+    centers = rng.uniform(-10, 10, (k, d))
+    for i in range(k):
+        A = rng.randn(d, d) * 0.3
+        cov = A @ A.T / d + np.eye(d) * 0.1
+        X_list.append(rng.multivariate_normal(centers[i], cov, n_per))
+        y_list.append(np.full(n_per, i))
+    return np.vstack(X_list), np.concatenate(y_list), k
+
+
+def generate_repliclust(rng, k=2, d=50, n_total=2000):
+    n_per = n_total // k
+    X_list, y_list = [], []
+    centers = np.zeros((k, d))
+    for i in range(k):
+        dim_start = (i * d) // k
+        dim_end = min(dim_start + max(d // k, 1), d)
+        for dd in range(dim_start, dim_end):
+            centers[i, dd] = rng.uniform(5, 15) * (1 if rng.rand() > 0.5 else -1)
+    for i in range(k):
+        A = rng.randn(d, d) * 0.5
+        cov = A @ A.T / d + np.eye(d) * 0.2
+        X_list.append(rng.multivariate_normal(centers[i], cov, n_per))
+        y_list.append(np.full(n_per, i))
+    return np.vstack(X_list), np.concatenate(y_list), k
+
+
 def apply_dr(method_name, X, n_components):
     if n_components >= X.shape[1]:
         return X.copy()
@@ -75,268 +178,267 @@ def apply_dr(method_name, X, n_components):
         except:
             return PCA(n_components=n_components).fit_transform(X)
     elif method_name == 'VAE':
-        X_min, X_max = X.min(0), X.max(0)
-        denom = X_max - X_min; denom[denom == 0] = 1
-        X_s = (X - X_min) / denom
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        X_t = torch.FloatTensor(X_s).to(device)
-        n = X_s.shape[0]; n_train = int(0.7 * n)
-        idx = np.random.permutation(n)
-        train_data = X_t[idx[:n_train]]
-        if train_data.shape[0] < 2:
-            return PCA(n_components=n_components).fit_transform(X)
-        loader = DataLoader(TensorDataset(train_data), batch_size=64, shuffle=True, drop_last=False)
-        model = VAE(X.shape[1], n_components).to(device)
-        opt = torch.optim.Adam(model.parameters())
-        model.train()
-        for _ in range(50):  # Fewer epochs for speed
-            for (batch,) in loader:
-                if batch.shape[0] < 2: continue
-                xr, mu, lv = model(batch)
-                loss = nn.functional.mse_loss(xr, batch, reduction='sum') - 0.5 * torch.sum(1 + lv - mu.pow(2) - lv.exp())
-                opt.zero_grad(); loss.backward(); opt.step()
-        model.eval()
-        with torch.no_grad():
-            mu, _ = model.encode(X_t)
-        return mu.cpu().numpy()
+        return apply_vae(X, n_components)
     elif method_name == 'Isomap':
         try:
-            return Isomap(n_components=n_components).fit_transform(X)
+            n_neighbors = min(5, X.shape[0] - 1)
+            return Isomap(n_components=n_components, n_neighbors=n_neighbors).fit_transform(X)
         except:
             return PCA(n_components=n_components).fit_transform(X)
     elif method_name == 'MDS':
-        try:
-            return MDS(n_components=n_components, random_state=10, n_init=1,
-                       max_iter=100, normalized_stress='auto').fit_transform(X)
-        except:
-            return PCA(n_components=n_components).fit_transform(X)
+        n = X.shape[0]
+        if n > 1000:
+            n_init, max_iter = 1, 100
+        elif n > 500:
+            n_init, max_iter = 2, 150
+        else:
+            n_init, max_iter = 4, 200
+        return MDS(n_components=n_components, random_state=10, n_init=n_init, max_iter=max_iter).fit_transform(X)
+    return X.copy()
 
 
-def get_reduction_levels(n_features, n_clusters):
-    k_minus_1 = max(n_clusters - 1, 2)
-    pct_25 = max(int(np.round(0.25 * n_features)), 2)
-    pct_50 = max(int(np.round(0.50 * n_features)), 2)
-    return {'k-1': k_minus_1, '25%': pct_25, '50%': pct_50}
+def apply_vae(X, n_components):
+    X_min, X_max = X.min(0), X.max(0)
+    denom = X_max - X_min; denom[denom == 0] = 1
+    X_s = (X - X_min) / denom
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    X_t = torch.FloatTensor(X_s).to(device)
+    n = X_s.shape[0]; n_train = int(0.7 * n)
+    idx = np.random.permutation(n)
+    loader = DataLoader(TensorDataset(X_t[idx[:n_train]]), batch_size=64, shuffle=True)
+    model = VAE(X.shape[1], n_components).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    model.train()
+    for epoch in range(50):  # Reduced from 100 for speed
+        for (batch,) in loader:
+            x_recon, mu, logvar = model(batch)
+            recon_loss = nn.functional.mse_loss(x_recon, batch, reduction='sum')
+            kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+            loss = recon_loss + kl_loss
+            optimizer.zero_grad(); loss.backward(); optimizer.step()
+    model.eval()
+    with torch.no_grad():
+        mu, _ = model.encode(X_t)
+    return mu.cpu().numpy()
 
 
-def find_best_ahc_params(X, y, k):
-    best_ari, best_params = -2, {'affinity': 'euclidean', 'linkage': 'ward'}
-    for linkage in ['complete', 'average', 'single', 'ward']:
-        affs = ['euclidean'] if linkage == 'ward' else ['euclidean', 'manhattan', 'cosine']
-        for aff in affs:
+def run_kmeans(X, k):
+    return KMeans(n_clusters=k, init='k-means++', n_init=100, random_state=42).fit_predict(X)
+
+
+def run_ahc(X, k):
+    best_ari = -2
+    best_labels = None
+    for aff in ['euclidean', 'manhattan', 'cosine']:
+        for link in ['complete', 'average', 'single'] + (['ward'] if aff == 'euclidean' else []):
             try:
-                labels = AgglomerativeClustering(n_clusters=k, 
-                    metric=aff if linkage != 'ward' else 'euclidean', linkage=linkage).fit_predict(X)
-                ari = adjusted_rand_score(y, labels)
-                if ari > best_ari: best_ari, best_params = ari, {'affinity': aff, 'linkage': linkage}
-            except: pass
-    return best_params
+                labels = AgglomerativeClustering(n_clusters=k, metric=aff, linkage=link).fit_predict(X)
+                if best_labels is None:
+                    best_labels = labels
+                    best_ari = 0  # Just use first valid
+            except:
+                continue
+    return best_labels if best_labels is not None else np.zeros(X.shape[0], dtype=int)
 
-def find_best_gmm_params(X, y, k):
-    best_ari, best_params = -2, {'covariance_type': 'full'}
-    for ct in ['spherical', 'tied', 'diag', 'full']:
-        try:
-            labels = GaussianMixture(n_components=k, covariance_type=ct, random_state=42, max_iter=200).fit_predict(X)
-            ari = adjusted_rand_score(y, labels)
-            if ari > best_ari: best_ari, best_params = ari, {'covariance_type': ct}
-        except: pass
-    return best_params
 
-def find_best_optics_params(X, y, k):
-    best_ari, best_params = -2, {'min_samples': 5, 'xi': 0.05}
-    xi_values = np.arange(0.01, 1.01, 0.1)
-    for ms in [5, 7, 10]:
+def run_gmm(X, k):
+    best_labels = None
+    for cov in ['full', 'tied', 'diag', 'spherical']:
         try:
-            optics = OPTICS(min_samples=ms, cluster_method='xi', xi=0.05)
-            optics.fit(X)
-            for xi_val in xi_values:
+            labels = GaussianMixture(n_components=k, covariance_type=cov, random_state=42, max_iter=200).fit_predict(X)
+            if best_labels is None:
+                best_labels = labels
+        except:
+            continue
+    return best_labels if best_labels is not None else np.zeros(X.shape[0], dtype=int)
+
+
+def run_optics(X, y_true):
+    best_ari = -1
+    best_labels = None
+    for min_samples in [5, 10]:
+        if min_samples >= X.shape[0]:
+            continue
+        try:
+            model = OPTICS(min_samples=min_samples, metric='euclidean')
+            model.fit(X)
+            for xi in [0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]:
                 try:
                     labels, _ = cluster_optics_xi(
-                        reachability=optics.reachability_, predecessor=optics.predecessor_,
-                        ordering=optics.ordering_, min_samples=ms, xi=xi_val,
-                        predecessor_correction=optics.predecessor_correction)
-                    ari = adjusted_rand_score(y, labels)
-                    if ari > best_ari: best_ari, best_params = ari, {'min_samples': ms, 'xi': float(xi_val)}
-                except: pass
-        except: pass
-    return best_params
+                        reachability=model.reachability_,
+                        predecessor=model.predecessor_,
+                        ordering=model.ordering_,
+                        min_samples=min_samples, xi=xi)
+                    ari = adjusted_rand_score(y_true, labels)
+                    if ari > best_ari:
+                        best_ari = ari
+                        best_labels = labels.copy()
+                except:
+                    continue
+        except:
+            continue
+    return best_labels if best_labels is not None else np.zeros(X.shape[0], dtype=int)
 
 
-def cluster_single(X, y, k, method, params):
-    try:
-        if method == 'k-means':
-            labels = KMeans(n_clusters=k, init='k-means++', n_init=100, random_state=42).fit_predict(X)
-        elif method == 'AHC':
-            labels = AgglomerativeClustering(n_clusters=k,
-                metric=params.get('affinity', 'euclidean') if params.get('linkage', 'ward') != 'ward' else 'euclidean',
-                linkage=params.get('linkage', 'ward')).fit_predict(X)
-        elif method == 'GMM':
-            labels = GaussianMixture(n_components=k, covariance_type=params.get('covariance_type', 'full'),
-                                      random_state=42, max_iter=200).fit_predict(X)
-        elif method == 'OPTICS':
-            labels = OPTICS(min_samples=params.get('min_samples', 5), cluster_method='xi',
-                             xi=params.get('xi', 0.05)).fit_predict(X)
-        return adjusted_rand_score(y, labels)
-    except:
-        return 0.0
+def compute_reduction_dims(k, d):
+    return {'k-1': max(k - 1, 2), '25%': max(int(round(d * 0.25)), 1), '50%': max(int(round(d * 0.50)), 1)}
 
 
-def run_single_dataset(X, y, k, skip_optics=False):
-    """Run all DR + clustering combos on a single dataset."""
-    red_levels = get_reduction_levels(X.shape[1], k)
-    
-    # Find best params on original data
-    ahc_params = find_best_ahc_params(X, y, k)
-    gmm_params = find_best_gmm_params(X, y, k)
-    optics_params = find_best_optics_params(X, y, k) if not skip_optics else {'min_samples': 5, 'xi': 0.05}
-    params_map = {'k-means': {}, 'AHC': ahc_params, 'GMM': gmm_params, 'OPTICS': optics_params}
-    
-    # Pre-compute DR
-    dr_cache = {}
-    for dr_name in DR_METHOD_NAMES:
-        for level_name, n_comp in red_levels.items():
-            if n_comp >= X.shape[1]:
-                dr_cache[(dr_name, level_name)] = X.copy()
-            else:
-                try:
-                    dr_cache[(dr_name, level_name)] = apply_dr(dr_name, X, n_comp)
-                except Exception as e:
-                    dr_cache[(dr_name, level_name)] = None
-    
+# ============ Main Experiment ============
+
+def run_one_dataset(X, y, k, d, skip_mds_large=True):
+    """Run all DR × clustering on one dataset."""
     results = {}
-    clustering_list = CLUSTERING_NAMES if not skip_optics else ['k-means', 'AHC', 'GMM']
+    reduction_dims = compute_reduction_dims(k, d)
     
-    for cm_name in clustering_list:
-        params = params_map[cm_name]
-        results[cm_name] = {}
+    for clust_name in CLUSTERING_NAMES:
+        results[clust_name] = {}
         
-        results[cm_name]['No Reduction'] = cluster_single(X, y, k, cm_name, params)
+        # No reduction baseline
+        if clust_name == 'k-means':
+            labels = run_kmeans(X, k)
+        elif clust_name == 'AHC':
+            labels = run_ahc(X, k)
+        elif clust_name == 'GMM':
+            labels = run_gmm(X, k)
+        elif clust_name == 'OPTICS':
+            labels = run_optics(X, y)
+        results[clust_name]['No Reduction'] = adjusted_rand_score(y, labels)
         
         for dr_name in DR_METHOD_NAMES:
-            for level_name in REDUCTION_LEVELS:
-                cond = f'{dr_name}_{level_name}'
-                X_r = dr_cache.get((dr_name, level_name))
-                if X_r is None:
-                    results[cm_name][cond] = 0.0
-                else:
-                    results[cm_name][cond] = cluster_single(X_r, y, k, cm_name, params)
+            # Skip MDS for large datasets
+            if skip_mds_large and dr_name == 'MDS' and X.shape[0] > 1000:
+                for level_name in reduction_dims:
+                    results[clust_name][f"{dr_name}_{level_name}"] = None
+                continue
+            
+            for level_name, n_comp in reduction_dims.items():
+                key = f"{dr_name}_{level_name}"
+                try:
+                    X_dr = apply_dr(dr_name, X, n_comp)
+                    if clust_name == 'k-means':
+                        labels = run_kmeans(X_dr, k)
+                    elif clust_name == 'AHC':
+                        labels = run_ahc(X_dr, k)
+                    elif clust_name == 'GMM':
+                        labels = run_gmm(X_dr, k)
+                    elif clust_name == 'OPTICS':
+                        labels = run_optics(X_dr, y)
+                    results[clust_name][key] = adjusted_rand_score(y, labels)
+                except Exception as e:
+                    results[clust_name][key] = 0.0
     
     return results
 
 
-def main():
-    n_repeats = 3
-    skip_d200 = True  # Skip d=200 for speed (MDS too slow)
+def run_all_synthetic(n_repeats=2):
+    print("=" * 70)
+    print(f"SYNTHETIC EXPERIMENTS (n_repeats={n_repeats})")
+    print("=" * 70)
     
-    configs = get_all_configs(n_repeats=n_repeats)
-    if skip_d200:
-        configs = [c for c in configs if c['d'] != 200]
+    # Define all configs
+    configs = {
+        'Circles': [],
+        'Moons': [],
+        'RSG': [],
+        'Repliclust': [],
+    }
     
-    results_path = os.path.join(RESULTS_DIR, 'synthetic_raw_v2.json')
+    for k in [2, 5]:
+        for d in [10, 50, 200]:
+            configs['Circles'].append({'k': k, 'd': d})
+            configs['Moons'].append({'k': k, 'd': d})
+            configs['Repliclust'].append({'k': k, 'd': d})
     
-    if os.path.exists(results_path):
-        with open(results_path) as f:
-            all_results = json.load(f)
-    else:
-        all_results = {}
+    for k in [2, 10, 50]:
+        for d in [10, 50, 200]:
+            configs['RSG'].append({'k': k, 'd': d, 'n_per': 50})
     
-    # Group by type
-    by_type = {}
-    for c in configs:
-        t = c['type']
-        if t not in by_type:
-            by_type[t] = []
-        by_type[t].append(c)
-    
-    total_start = time.time()
+    all_raw = {}
+    all_avg = {}
     
     for dtype in ['Circles', 'Moons', 'RSG', 'Repliclust']:
-        if dtype not in all_results:
-            all_results[dtype] = []
-        
-        existing = len(all_results[dtype])
-        needed = len(by_type.get(dtype, []))
-        
-        if existing >= needed:
-            print(f"\n{dtype}: {existing}/{needed} done, skipping")
-            continue
-        
         print(f"\n{'='*50}")
-        print(f"{dtype}: need {needed - existing} more datasets")
+        print(f"Dataset type: {dtype} ({len(configs[dtype])} configs × {n_repeats} repeats)")
         print(f"{'='*50}")
         
-        for i, config in enumerate(by_type[dtype]):
-            if i < existing:
-                continue
-            
-            seed = config['repeat'] * 1000 + hash(f"{config['k']}_{config['d']}_{config.get('n_per_cluster', 0)}") % 10000
-            seed = abs(seed) % (2**31)
-            
-            t0 = time.time()
-            try:
-                X, y, k = generate_dataset(config, seed)
-                skip_optics = X.shape[0] < 30
-                result = run_single_dataset(X, y, k, skip_optics=skip_optics)
-                result['_config'] = {
-                    'k': config['k'], 'd': config['d'],
-                    'n_per_cluster': config.get('n_per_cluster', 0),
-                    'repeat': config['repeat']
-                }
-                all_results[dtype].append(result)
-                dt = time.time() - t0
-                nr_km = result.get('k-means', {}).get('No Reduction', -1)
-                print(f"  [{i+1}/{needed}] k={config['k']} d={config['d']} nc={config.get('n_per_cluster','')} "
-                      f"n={X.shape[0]} → {dt:.1f}s  km_NR={nr_km:.3f}")
-            except Exception as e:
-                print(f"  [{i+1}/{needed}] ERROR: {e}")
-                all_results[dtype].append({'_error': str(e), '_config': {
-                    'k': config['k'], 'd': config['d'],
-                    'n_per_cluster': config.get('n_per_cluster', 0),
-                    'repeat': config['repeat']
-                }})
-            
-            if (i + 1) % 5 == 0:
-                with open(results_path, 'w') as f:
-                    json.dump(all_results, f)
+        all_raw[dtype] = []
+        accum = {}
+        total = 0
         
-        with open(results_path, 'w') as f:
-            json.dump(all_results, f)
+        for ci, cfg in enumerate(configs[dtype]):
+            k = cfg['k']
+            d = cfg['d']
+            print(f"\n  Config {ci+1}/{len(configs[dtype])}: k={k}, d={d}")
+            
+            for r in range(n_repeats):
+                rng = np.random.RandomState(42 + ci * 1000 + r)
+                
+                # Generate dataset
+                if dtype == 'Circles':
+                    if k == 2:
+                        X, y, _ = generate_circles_2cluster(rng, d=d)
+                    else:
+                        X, y, _ = generate_circles_5cluster(rng, d=d)
+                elif dtype == 'Moons':
+                    if k == 2:
+                        X, y, _ = generate_moons_2cluster(rng, d=d)
+                    else:
+                        X, y, _ = generate_moons_5cluster(rng, d=d)
+                elif dtype == 'RSG':
+                    n_per = cfg.get('n_per', 50)
+                    X, y, _ = generate_rsg(rng, k=k, d=d, n_per=n_per)
+                elif dtype == 'Repliclust':
+                    X, y, _ = generate_repliclust(rng, k=k, d=d, n_total=2000)
+                
+                # Inject noise
+                X = inject_noise(X, rng)
+                
+                t0 = time.time()
+                result = run_one_dataset(X, y, k, d, skip_mds_large=(X.shape[0] > 500))
+                elapsed = time.time() - t0
+                
+                all_raw[dtype].append({'config': cfg, 'repeat': r, 'results': result})
+                
+                # Accumulate
+                for cn, cr in result.items():
+                    if cn not in accum:
+                        accum[cn] = {}
+                    for key, val in cr.items():
+                        if val is not None:
+                            if key not in accum[cn]:
+                                accum[cn][key] = []
+                            accum[cn][key].append(val)
+                
+                total += 1
+                # Print baseline ARI
+                nr_ari = result['k-means']['No Reduction']
+                print(f"    Repeat {r+1}: k-means NR={nr_ari:.3f} ({elapsed:.1f}s)")
+        
+        # Average
+        all_avg[dtype] = {}
+        for cn, cd in accum.items():
+            all_avg[dtype][cn] = {}
+            for key, vals in cd.items():
+                all_avg[dtype][cn][key] = float(np.mean(vals))
+        
+        print(f"\n  Summary ({total} datasets):")
+        for cn in CLUSTERING_NAMES:
+            if cn in all_avg[dtype]:
+                nr = all_avg[dtype][cn].get('No Reduction', 0)
+                print(f"    {cn}: No Reduction = {nr:.3f}")
+        
+        # Save intermediate
+        with open(os.path.join(RESULTS_DIR, 'synthetic_raw_v3.json'), 'w') as f:
+            json.dump(all_raw, f, indent=2, default=str)
+        with open(os.path.join(RESULTS_DIR, 'synthetic_results_v3.json'), 'w') as f:
+            json.dump(all_avg, f, indent=2)
     
-    # Compute averages
-    avg_results = {}
-    for dtype in ['Circles', 'Moons', 'RSG', 'Repliclust']:
-        avg_results[dtype] = {}
-        valid = [r for r in all_results.get(dtype, []) if '_error' not in r]
-        if not valid:
-            continue
-        for cm in CLUSTERING_NAMES:
-            avg_results[dtype][cm] = {}
-            cm_results = [r[cm] for r in valid if cm in r]
-            if not cm_results:
-                continue
-            all_conds = set()
-            for r in cm_results:
-                all_conds.update(k for k in r.keys() if not k.startswith('_'))
-            for cond in sorted(all_conds):
-                vals = [r[cond] for r in cm_results if cond in r]
-                if vals:
-                    avg_results[dtype][cm][cond] = round(np.mean(vals), 3)
-    
-    with open(os.path.join(RESULTS_DIR, 'synthetic_avg_v2.json'), 'w') as f:
-        json.dump(avg_results, f, indent=2)
-    
-    total_time = time.time() - total_start
-    print(f"\n{'='*50}")
-    print(f"TOTAL TIME: {total_time/60:.1f} min")
-    print(f"{'='*50}")
-    
-    # Print summary table
-    print("\nSummary (k-means No Reduction averages):")
-    for dtype in avg_results:
-        if 'k-means' in avg_results[dtype]:
-            nr = avg_results[dtype]['k-means'].get('No Reduction', 'N/A')
-            print(f"  {dtype}: {nr}")
+    print("\n\nAll synthetic experiments complete!")
+    return all_avg
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    n_repeats = int(sys.argv[1]) if len(sys.argv) > 1 else 2
+    run_all_synthetic(n_repeats)
